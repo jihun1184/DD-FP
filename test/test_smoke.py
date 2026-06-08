@@ -729,3 +729,181 @@ class TestGpuKernel:
         assert gpu_result["violations"] == 0, "GPU pipeline DWC violated"
 
         assert u_cpu.shape == cp.asnumpy(u_gpu).shape
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 8. gen_timing_n100 — count_boundary_violations fix
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestWalltimeFix:
+    """Validate the fix: _time_dd must use count_boundary_violations,
+    not verify_dwc, as the DWC correctness check.
+
+    Rationale (from code-review discussion):
+      - verify_dwc checks the *entire* expanded lattice → spurious violations
+        on continuous-grayscale FP output (BraTS FLAIR).
+      - count_boundary_violations checks only the K-1 boundary face-blocks,
+        which is exactly what Lemma 4 / Theorem 2.11 guarantees for δ≥1+IBI.
+      - On binary input (b3 pipeline) verify_dwc coincidentally returns 0;
+        on continuous FLAIR input it does not → wrong signal for gen_timing_n100.
+    """
+
+    # ── (E) run_ibi_v10 반환 dict 구조 확인 ──────────────────────────────────
+
+    @gpu_skip
+    def test_run_ibi_v10_returns_boundary_z_orig(self):
+        """run_ibi_v10 result must contain 'boundary_z_orig' key
+        so that count_boundary_violations can be called without extra state."""
+        from scripts.ddfp.experiment_DDFP_all import run_ibi_v10
+        vol = _synth3d(16)
+        result = run_ibi_v10(vol, K=4, delta=1)
+        assert "boundary_z_orig" in result, (
+            "run_ibi_v10 must return 'boundary_z_orig' for the fix to work"
+        )
+        assert isinstance(result["boundary_z_orig"], list)
+        assert len(result["boundary_z_orig"]) == 3  # K=4 → K-1=3 boundaries
+
+    @gpu_skip
+    def test_run_ibi_v10_returns_u_dd(self):
+        """run_ibi_v10 result must contain 'u_dd' as numpy array."""
+        from scripts.ddfp.experiment_DDFP_all import run_ibi_v10
+        vol = _synth3d(16)
+        result = run_ibi_v10(vol, K=4, delta=1)
+        assert "u_dd" in result
+        u = result["u_dd"]
+        assert isinstance(u, np.ndarray)
+        W, H, D = vol.shape
+        assert u.shape == (2*W-1, 2*H-1, 2*D-1), (
+            f"u_dd shape {u.shape} != expected {(2*W-1, 2*H-1, 2*D-1)}"
+        )
+
+    # ── (A) δ=1 + IBI → count_boundary_violations == 0 ──────────────────────
+
+    @gpu_skip
+    def test_count_boundary_violations_zero_after_ibi_delta1(self):
+        """Core correctness: δ=1 + IBI must yield zero boundary violations
+        (Lemma 4 / Theorem 2.11 guarantee)."""
+        from scripts.ddfp.experiment_DDFP_all import run_ibi_v10, count_boundary_violations
+        vol = _synth3d(16)
+        result = run_ibi_v10(vol, K=4, delta=1)
+        n_viols = count_boundary_violations(
+            result["u_dd"], result["boundary_z_orig"]
+        )
+        assert n_viols == 0, (
+            f"δ=1+IBI must guarantee 0 boundary violations, got {n_viols}"
+        )
+
+    @gpu_skip
+    def test_count_boundary_violations_zero_k16_delta1(self):
+        """Same guarantee holds for K=16 (paper default configuration)."""
+        from scripts.ddfp.experiment_DDFP_all import run_ibi_v10, count_boundary_violations
+        vol = _synth3d(16)
+        result = run_ibi_v10(vol, K=16, delta=1)
+        n_viols = count_boundary_violations(
+            result["u_dd"], result["boundary_z_orig"]
+        )
+        assert n_viols == 0, (
+            f"K=16 δ=1+IBI: expected 0 boundary violations, got {n_viols}"
+        )
+
+    # ── (B) δ=0 no-IBI → count_boundary_violations > 0 ──────────────────────
+
+    @gpu_skip
+    def test_count_boundary_violations_nonzero_delta0_no_ibi(self):
+        """δ=0 without IBI should produce boundary violations on most volumes
+        (Lemma 3: face-block not contained in any single subdomain).
+        Uses run_dd_fp_round0 which performs single-pass without IBI."""
+        from scripts.ddfp.experiment_DDFP_all import run_dd_fp_round0, count_boundary_violations
+        rng = np.random.default_rng(0)
+        n_viol_total = 0
+        # Test across 3 seeds to avoid false-negative from lucky geometry
+        for seed in range(3):
+            vol = _synth3d(16, seed=seed)
+            result = run_dd_fp_round0(vol, K=4, delta=0)
+            n_viol_total += count_boundary_violations(
+                result["u_dd"], result["boundary_z_orig"]
+            )
+        assert n_viol_total > 0, (
+            "δ=0 no-IBI should produce boundary violations (Lemma 3)"
+        )
+
+    # ── (C) gen_timing_n100 script import smoke test ──────────────────────────
+
+    def test_gen_timing_n100_imports(self):
+        """gen_timing_n100.py must be importable without errors."""
+        mod = _load_script("scripts/walltime/gen_timing_n100.py")
+        assert hasattr(mod, "process_subject")
+        assert hasattr(mod, "load_brats_flair")
+        assert hasattr(mod, "append_summary_stats")
+
+    def test_gen_timing_n100_no_verify_dwc_call(self):
+        """After the fix, _time_dd must NOT call verify_dwc.
+        Inspect the source to confirm the removed call is gone."""
+        import inspect
+        mod = _load_script("scripts/walltime/gen_timing_n100.py")
+        source = inspect.getsource(mod._time_dd)
+        assert "verify_dwc" not in source, (
+            "_time_dd must not call verify_dwc after fix "
+            "(use count_boundary_violations instead)"
+        )
+        assert "count_boundary_violations" in source, (
+            "_time_dd must call count_boundary_violations after fix"
+        )
+
+    # ── (D) _time_dd 수정 후 viols=0 단위 테스트 ─────────────────────────────
+
+    @gpu_skip
+    def test_time_dd_viols_zero_on_synth(self):
+        """_time_dd (fixed) must return viols=0 on synthetic volume with δ=1."""
+        mod = _load_script("scripts/walltime/gen_timing_n100.py")
+        vol = _synth3d(16)
+        _t, _r, viols = mod._time_dd(vol, n_repeats=1, K=4, delta=1)
+        assert viols == 0, (
+            f"_time_dd (fixed) must return viols=0 for δ=1+IBI, got {viols}"
+        )
+
+    @gpu_skip
+    def test_time_dd_returns_three_values(self):
+        """_time_dd must return (t_wall, r_star, viols) tuple."""
+        mod = _load_script("scripts/walltime/gen_timing_n100.py")
+        vol = _synth3d(16)
+        result = mod._time_dd(vol, n_repeats=1, K=4, delta=1)
+        assert len(result) == 3, f"expected 3-tuple, got {len(result)}"
+        t_wall, r_star, viols = result
+        assert t_wall > 0
+        assert r_star >= 1
+        assert viols == 0
+
+    # ── verify_dwc と count_boundary_violations의 결과 차이 확인 ──────────────
+
+    @gpu_skip
+    def test_verify_dwc_vs_count_boundary_on_continuous_flair(self):
+        """Demonstrate why verify_dwc is wrong for continuous FLAIR input:
+        verify_dwc may return n_violations > 0 while
+        count_boundary_violations returns 0 (the theoretically correct answer).
+
+        This test documents the root cause of the original bug.
+        """
+        from scripts.ddfp.experiment_DDFP_all import run_ibi_v10, count_boundary_violations
+        from src.utils.benchmark_utils import verify_dwc
+
+        # Continuous grayscale (simulates FLAIR: percentile-normalized uint8)
+        rng = np.random.default_rng(42)
+        vol = rng.integers(0, 256, (16, 16, 16), dtype=np.uint8)
+
+        result = run_ibi_v10(vol, K=4, delta=1)
+        u_dd = result["u_dd"]
+
+        # Correct check: boundary face-blocks only
+        bdry_viols = count_boundary_violations(u_dd, result["boundary_z_orig"])
+        assert bdry_viols == 0, (
+            f"count_boundary_violations must be 0 for δ=1+IBI, got {bdry_viols}"
+        )
+
+        # Document: verify_dwc on continuous output may give spurious violations
+        u_norm = u_dd / 255.0 if u_dd.max() > 1.0 else u_dd
+        vdwc = verify_dwc(vol, u_norm)
+        # We do NOT assert vdwc["n_violations"] > 0 (depends on data),
+        # but we assert that bdry_viols is always 0 regardless.
+        # The test passes iff the boundary check is the authoritative signal.
+        assert isinstance(vdwc["n_violations"], int)

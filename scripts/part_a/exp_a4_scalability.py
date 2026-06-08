@@ -20,12 +20,11 @@ Analysis
   Report b: expect b ~ 1.0 (linear scaling)
   If b > 1.2: flag as super-linear
 
-Reuse from experiments.zip
---------------------------
-  - benchmark_timimg.py: time_gpu_single_pass() pattern
-    (build_ispan_gpu + front_propagation_gpu + device->host transfer)
-  - timing_n100.csv: BraTS 3D single-subject data point can be appended
-    as a reference row (240x240x155 = 8.9M voxels, t_gpu1=4.48s median)
+BraTS reference point
+---------------------
+  Loaded from timing_n100.csv (--timing-n100-csv).
+  Column used: t_gpu1_s  (GPU single-pass K=1, N subjects, median).
+  Shape: 240x240x155 = 8.9M voxels.
 
 Output
 ------
@@ -38,9 +37,10 @@ Output
 """
 from __future__ import annotations
 
+import argparse
 import csv
+import statistics
 import sys
-import time
 from pathlib import Path
 
 import numpy as np
@@ -67,21 +67,48 @@ SIZES_3D = [64, 128, 256]      # 512^3 attempted with OOM guard
 N_REPEATS = 5
 WARMUP    = 1
 
-# BraTS reference data point from timing_n100.csv (median of 100 subjects)
-# shape: 240x240x155, single-pass GPU time = 2.463s
-# Source: gen_timing_n100.py on RTX 3080 Ti Laptop
-BRATS_REF = {
-    "ndim": 3,
-    "size_str": "240x240x155",
-    "n_voxels": 240 * 240 * 155,
-    "time_s": 2.463,
-    "peak_memory_mb": None,
-    "source": "timing_n100.csv (BraTS2021, N=100 median)",
-}
+
+# ---------------------------------------------------------------------------
+# Load BraTS reference point from timing_n100.csv
+# ---------------------------------------------------------------------------
+
+def _load_brats_ref(timing_n100_csv: Path) -> dict:
+    """
+    Load the BraTS reference data point from timing_n100.csv.
+    Uses the median of t_gpu1_s (GPU single-pass K=1) across all subjects.
+    Raises FileNotFoundError if the file is missing.
+    """
+    if not timing_n100_csv.exists():
+        raise FileNotFoundError(
+            f"timing_n100.csv not found: {timing_n100_csv}\n"
+            "Generate it with scripts/walltime/gen_timing_n100.py"
+        )
+    with open(timing_n100_csv, newline="") as f:
+        rows = list(csv.DictReader(f))
+
+    gpu1_vals = [
+        float(r["t_gpu1_s"]) for r in rows
+        if r.get("t_gpu1_s") not in (None, "", "None")
+    ]
+    if not gpu1_vals:
+        raise ValueError(f"No valid t_gpu1_s values in {timing_n100_csv}")
+
+    t_gpu1_median = round(statistics.median(gpu1_vals), 3)
+    print(f"  [A4] Loaded {timing_n100_csv.name}: "
+          f"BraTS t_gpu1_s median={t_gpu1_median:.3f}s (N={len(gpu1_vals)})")
+
+    return {
+        "ndim": 3,
+        "size_str": "240x240x155",
+        "n_voxels": 240 * 240 * 155,
+        "time_s": t_gpu1_median,
+        "peak_memory_mb": None,
+        "source": f"{timing_n100_csv.name} (BraTS2021, N={len(gpu1_vals)} median)",
+    }
 
 
 # ---------------------------------------------------------------------------
-# GPU runner: build_ispan + FP + device->host (matches benchmark_timimg pattern)
+# GPU runner
 # ---------------------------------------------------------------------------
 
 def _ensure_3d(vol: np.ndarray) -> np.ndarray:
@@ -130,13 +157,11 @@ def _fit_scaling_exponent(n_voxels: list[int], times: list[float]) -> tuple[floa
     x = np.log(np.array(n_voxels, dtype=float))
     y = np.log(np.array(times,    dtype=float))
 
-    # Remove NaN / inf
     mask = np.isfinite(x) & np.isfinite(y)
     if mask.sum() < 2:
         return float("nan"), float("nan")
 
     x, y = x[mask], y[mask]
-    # OLS: [1, x] @ [a, b] = y
     A = np.column_stack([np.ones_like(x), x])
     result = np.linalg.lstsq(A, y, rcond=None)
     a, b = result[0]
@@ -147,10 +172,22 @@ def _fit_scaling_exponent(n_voxels: list[int], times: list[float]) -> tuple[floa
 # Main
 # ---------------------------------------------------------------------------
 
-def run_a4(out_dir: Path) -> None:
+def run_a4(
+    out_dir: Path,
+    timing_n100_csv: Path | None = None,
+) -> None:
+    """
+    Parameters
+    ----------
+    out_dir         : directory for CSV and PNG outputs
+    timing_n100_csv : path to timing_n100.csv (default: ROOT/timing_n100.csv)
+    """
     if not _CUPY_OK:
         print("[ERROR] Exp A4 requires CuPy/GPU. Skipping.")
         return
+
+    if timing_n100_csv is None:
+        timing_n100_csv = ROOT / "timing_n100.csv"
 
     out_dir.mkdir(parents=True, exist_ok=True)
     rows = []
@@ -169,13 +206,11 @@ def run_a4(out_dir: Path) -> None:
 
         n_voxels = int(np.prod(shape))
         shape_str = "x".join(str(s) for s in shape)
-        size_val  = shape[0]   # representative side length
+        size_val  = shape[0]
 
-        # Promote 2D to 3D for GPU pipeline
         vol = generate_synthetic_volume(shape, seed=seed)
         vol_gpu_input = vol[:, :, np.newaxis] if ndim == 2 else vol
 
-        # Timing
         try:
             t = time_function(_run_gpu_full, vol_gpu_input,
                               n_repeats=N_REPEATS, warmup=WARMUP,
@@ -192,7 +227,6 @@ def run_a4(out_dir: Path) -> None:
             })
             return
 
-        # Peak memory (single run)
         try:
             peak_mb = _measure_peak_memory_mb(vol_gpu_input)
         except Exception:
@@ -239,18 +273,19 @@ def run_a4(out_dir: Path) -> None:
         })
 
     # Append BraTS reference point (from timing_n100.csv)
+    brats_ref = _load_brats_ref(timing_n100_csv)
     rows.append({
         "ndim":            3,
         "size":            240,
-        "shape":           BRATS_REF["size_str"],
-        "n_voxels":        BRATS_REF["n_voxels"],
-        "time_s":          BRATS_REF["time_s"],
-        "peak_memory_mb":  BRATS_REF["peak_memory_mb"],
-        "voxels_per_sec":  round(BRATS_REF["n_voxels"] / BRATS_REF["time_s"]),
-        "source":          BRATS_REF["source"],
+        "shape":           brats_ref["size_str"],
+        "n_voxels":        brats_ref["n_voxels"],
+        "time_s":          brats_ref["time_s"],
+        "peak_memory_mb":  brats_ref["peak_memory_mb"],
+        "voxels_per_sec":  round(brats_ref["n_voxels"] / brats_ref["time_s"]),
+        "source":          brats_ref["source"],
     })
-    print(f"\n  (+ BraTS ref: {BRATS_REF['size_str']}, "
-          f"t={BRATS_REF['time_s']}s from timing_n100.csv)")
+    print(f"\n  (+ BraTS ref: {brats_ref['size_str']}, "
+          f"t={brats_ref['time_s']}s from {timing_n100_csv.name})")
 
     # CSV
     csv_path = out_dir / "a4_scalability.csv"
@@ -269,7 +304,7 @@ def run_a4(out_dir: Path) -> None:
                  for r in rows
                  if r["ndim"] == ndim
                  and r["time_s"] is not None
-                 and r["source"] != BRATS_REF["source"]]  # exclude ref for fair fit
+                 and r["source"] == "measured"]
         if len(valid) < 2:
             print(f"  {ndim}D: insufficient data points")
             continue
@@ -279,7 +314,6 @@ def run_a4(out_dir: Path) -> None:
         print(f"  {ndim}D: b = {b:.3f}  (a = {a:.3f})"
               f"  => {'linear' if b <= 1.2 else 'super-linear'}{flag}")
 
-    # Plot
     _plot_loglog(rows, out_dir)
     print(f"{'='*70}\n")
 
@@ -319,7 +353,6 @@ def _plot_loglog(rows: list[dict], out_dir: Path) -> None:
             ax.scatter(ns, ts, color=st["color"], marker=st["marker"],
                        s=60, zorder=5, label=st["label"])
 
-            # Fit and overlay line
             a, b = _fit_scaling_exponent(list(ns), list(ts))
             if np.isfinite(b):
                 ns_arr = np.array(sorted(ns))
@@ -328,17 +361,14 @@ def _plot_loglog(rows: list[dict], out_dir: Path) -> None:
                         linestyle="--", linewidth=1.5,
                         label=f"{ndim}D fit: $b={b:.2f}$")
 
-        # Reference point (BraTS) as a star
         for n, t in ref_pts:
             ax.scatter([n], [t], color=st["color"], marker="*",
                        s=150, zorder=6, label=f"3D ref (BraTS)")
 
-    # Ideal linear reference line
     all_n = [r["n_voxels"] for r in rows if r["time_s"] is not None]
     if all_n:
         n_min, n_max = min(all_n), max(all_n)
         ns_ref = np.array([n_min, n_max], dtype=float)
-        # Anchor through median point
         valid_t = [r["time_s"] for r in rows
                    if r["time_s"] is not None and r["n_voxels"] == n_min]
         if valid_t:
@@ -362,6 +392,18 @@ def _plot_loglog(rows: list[dict], out_dir: Path) -> None:
     print(f"  Plot -> {path}")
 
 
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Exp A4: Scalability Analysis")
+    p.add_argument("--out-dir", type=Path, default=ROOT / "results" / "part_a",
+                   help="Output directory (default: ROOT/results/part_a)")
+    p.add_argument("--timing-n100-csv", type=Path, default=None,
+                   help="Path to timing_n100.csv  [default: ROOT/timing_n100.csv]")
+    return p.parse_args()
+
+
 if __name__ == "__main__":
-    out = ROOT / "results" / "part_a"
-    run_a4(out)
+    args = _parse_args()
+    run_a4(
+        out_dir=args.out_dir,
+        timing_n100_csv=args.timing_n100_csv,
+    )

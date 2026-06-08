@@ -12,7 +12,7 @@ Changes from original:
   [FIX-4] Wilcoxon signed-rank test (p<0.001, W=0 verification)
   [FIX-5] All values written to CSV; p-values printed in summary
 
-Confirmed paper value: naive_interp DRIVE TSI = 222.74 (9-point thresholds).
+Confirmed paper value: naive_interp DRIVE TSI ≈ 222.74 (9-point thresholds, historical reference only).
 
 Usage:
     python scripts/part_b/exp_b1_topology_accuracy.py \
@@ -254,6 +254,7 @@ def wilcoxon_test(x: list, y: list, label: str = "") -> dict:
 # Main
 
 def main(args: argparse.Namespace) -> None:
+    ref_csv: Path | None = getattr(args, "ref_csv", None)
     cfg = SimpleNamespace(preprocessing=SimpleNamespace(
         type="ddfp",
         naive_mode="bilinear",
@@ -425,7 +426,8 @@ def _print_summary(rows: list) -> None:
                           f"W={w:>5}  p={pval}  {sig}  {match}{note}")
 
     print("\n" + "─" * 70)
-    print("Paper (v18) values vs current run comparison")
+    ref_label = f"(ref: {ref_csv.name})" if ref_csv is not None else "(no --ref-csv provided)"
+    print(f"Current run vs reference comparison  {ref_label}")
     print("─" * 70)
     drive_rows = [r for r in rows if r["dataset"] == "drive"]
     if drive_rows:
@@ -440,30 +442,61 @@ def _print_summary(rows: list) -> None:
         naive_flip     = [r["chi_sign_flip"] for r in drive_rows
                           if r["preprocessing"] == "naive_interp"]
 
-        print(f"  {'metric':<35} {'paper':>12} {'this run':>12}")
-        print(f"  {'-'*35} {'-'*12} {'-'*12}")
-        print(f"  {'naive_interp TSI (DRIVE mean)':<35} "
-              f"{'222.74':>12} {np.mean(naive_tsi_vals):>12.2f}  "
-              f"{'← TSI update needed' if abs(np.mean(naive_tsi_vals)-222.74) > 1 else 'OK'}")
-        print(f"  {'ddfp TSI (DRIVE mean)':<35} "
-              f"{'0.00':>12} {np.mean(ddfp_tsi_vals):>12.4f}  "
-              f"{'OK' if np.mean(ddfp_tsi_vals) == 0 else 'check'}")
-        print(f"  {'no_interp CC (DRIVE mean)':<35} "
-              f"{'448.25':>12} {np.mean(no_cc_vals):>12.2f}")
-        print(f"  {'naive_interp b0_cons (DRIVE mean)':<35} "
-              f"{'1.000':>12} {np.mean(naive_b0):>12.6f}")
-        print(f"  {'naive_interp chi_flip (DRIVE, %)':<35} "
-              f"{'95%':>12} {100*np.mean(naive_flip):>11.1f}%")
+        # Load reference values from a previous run CSV if provided.
+        # Expected columns: preprocessing, dataset, tsi, cc, b0_consistency, chi_sign_flip
+        ref_vals: dict = {}
+        if ref_csv is not None:
+            try:
+                import csv as _csv
+                with open(ref_csv, newline="") as _f:
+                    _ref_rows = [r for r in _csv.DictReader(_f)
+                                 if r.get("dataset", "drive") == "drive"]
+                def _ref_mean(prep, col):
+                    vals = [float(r[col]) for r in _ref_rows
+                            if r.get("preprocessing") == prep and r.get(col) not in (None, "", "None")]
+                    return round(np.mean(vals), 4) if vals else None
+                ref_vals = {
+                    "naive_tsi": _ref_mean("naive_interp", "tsi"),
+                    "ddfp_tsi":  _ref_mean("ddfp",         "tsi"),
+                    "no_cc":     _ref_mean("no_interp",    "cc"),
+                    "naive_b0":  _ref_mean("naive_interp", "b0_consistency"),
+                    "naive_flip":_ref_mean("naive_interp", "chi_sign_flip"),
+                }
+                print(f"  [B1] Reference values loaded from {ref_csv}")
+            except Exception as _e:
+                print(f"  [B1] Could not load ref CSV ({_e}); skipping reference column.")
 
-    print()
-    print("Paper value update needed:")
-    if drive_rows and naive_tsi_vals:
-        new_tsi = np.mean(naive_tsi_vals)
-        if abs(new_tsi - 222.74) > 2.0:
-            print(f"  TSI=222.74 → {new_tsi:.2f} update needed")
-            print(f"     update locations: Abstract, §1.3, §4.3 body, Table tab:partb-2d")
-        else:
-            print(f"  TSI error {abs(new_tsi-222.74):.2f} — within tolerance (paper v20 reference: 222.74)")
+        def _ref_str(key, fmt=".2f"):
+            v = ref_vals.get(key)
+            return f"{v:{fmt}}" if v is not None else "N/A"
+
+        has_ref = bool(ref_vals)
+        hdr_ref = f"{'ref run':>12}" if has_ref else ""
+        print(f"  {'metric':<35} {hdr_ref} {'this run':>12}")
+        print(f"  {'-'*35}" + (f" {'-'*12}" if has_ref else "") + f" {'-'*12}")
+
+        def _row(label, current_val, ref_key, fmt=".2f", pct=False):
+            cur_str = f"{current_val:{fmt}}" + ("%" if pct else "")
+            ref_str = (_ref_str(ref_key, fmt) + ("%" if pct else "")) if has_ref else ""
+            ref_col = f"{ref_str:>12}" if has_ref else ""
+            print(f"  {label:<35} {ref_col} {cur_str:>12}")
+
+        _row("naive_interp TSI (DRIVE mean)",   np.mean(naive_tsi_vals),        "naive_tsi")
+        _row("ddfp TSI (DRIVE mean)",           np.mean(ddfp_tsi_vals),         "ddfp_tsi", fmt=".4f")
+        _row("no_interp CC (DRIVE mean)",       np.mean(no_cc_vals),            "no_cc")
+        _row("naive_interp b0_cons (DRIVE mean)", np.mean(naive_b0),            "naive_b0", fmt=".6f")
+        _row("naive_interp chi_flip (DRIVE, %)", 100*np.mean(naive_flip),       "naive_flip", fmt=".1f", pct=True)
+
+        # Drift check against reference if available
+        if has_ref and ref_vals.get("naive_tsi") is not None and naive_tsi_vals:
+            new_tsi = np.mean(naive_tsi_vals)
+            delta   = abs(new_tsi - ref_vals["naive_tsi"])
+            print()
+            if delta > 2.0:
+                print(f"  [WARN] naive_interp TSI drifted {delta:.2f} from reference run "
+                      f"({ref_vals['naive_tsi']:.2f} → {new_tsi:.2f})")
+            else:
+                print(f"  TSI drift from reference: {delta:.2f} — within tolerance")
 
 
 # CLI
@@ -490,6 +523,13 @@ def _parse() -> argparse.Namespace:
     p.add_argument(
         "--output",
         default="results/part_b/exp_b1_results.csv",
+    )
+    p.add_argument(
+        "--ref-csv",
+        type=Path,
+        default=None,
+        help="Path to a previous exp_b1_results.csv for reference comparison. "
+             "If omitted, the reference column is hidden.",
     )
     return p.parse_args()
 
