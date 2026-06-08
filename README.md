@@ -134,7 +134,7 @@ pytest test/test_smoke.py -v               # GPU tests auto-skipped
 pytest test/test_smoke.py -v --run-gpu     # include GPU tests (requires CuPy)
 ```
 
-Expected: **63 passed, 4 skipped** (CPU-only).
+Expected: **77 passed**.
 
 ### Part A — DWC correctness & efficiency (no dataset required)
 
