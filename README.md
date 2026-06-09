@@ -309,14 +309,20 @@ Backend selection (GPU vs CPU) is automatic and happens once at import time.
 
 | Item | Version |
 |---|---|
-| OS | Ubuntu 20.04 / WSL2 |
-| Python | 3.10 |
-| CUDA | 11.8 |
-| CuPy | 12.2 |
-| NumPy | 1.26 |
-| SciPy | 1.11 |
-| GPU | NVIDIA RTX 3080 Ti Laptop (16 GB) |
-| CPU | Intel i9-12900H |
+| OS | Ubuntu 20.04 / WSL2 (Windows 11) |
+| Python | 3.10.19 |
+| CUDA runtime | 11.8 |
+| CUDA driver | 555.97 |
+| CuPy | 13.6.0 |
+| NumPy | 2.2.6 |
+| SciPy | 1.14.1 |
+| scikit-image | 0.24.0 |
+| nibabel | 5.3.2 |
+| matplotlib | 3.9.4 |
+| tqdm | 4.67.1 |
+| GPU | NVIDIA RTX 3080 Ti Laptop (16 GB GDDR6X) |
+| CPU | Intel Core i9-12900H (14 cores, up to 5.0 GHz) |
+| System RAM | 24 GB DDR5 |
 
 Full environment details are provided in Supplement S8 of the paper.
 
