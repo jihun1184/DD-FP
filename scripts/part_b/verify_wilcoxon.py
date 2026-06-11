@@ -1,25 +1,21 @@
 """
-scripts/part_b/verify_wilcoxon.py
------------------------------------
-DD-FP Part B — Wilcoxon signed-rank verification script.
+verify_wilcoxon.py
+==================
+DD-FP Part B — Wilcoxon signed-rank test script
 
-Reproduces all topology-consistency Wilcoxon claims from the paper
-using a results CSV only; no preprocessing pipeline re-run required.
+Performs topology-consistency Wilcoxon tests using the results CSV data.
 
-Test design:
+Test Design:
   - One-sided Wilcoxon signed-rank, zero_method='wilcox'
-  - Direction: ddfp is always the "smaller" side
-    (lower-is-better metrics: ddfp < baseline;
-     higher-is-better metrics: baseline < ddfp)
-  - W=0 means all differences point in the same direction (complete separation)
+  - Unified direction: For metrics where 'lower is better', we test ddfp < baseline (less)
+                       For metrics where 'higher is better', we test baseline < ddfp (less)
+  → In all tests, the side hypothesized to be "smaller" is unified to favor ddfp.
 
 Usage:
-    python scripts/part_b/verify_wilcoxon.py \
-        --csv results/part_b/exp_b1_v2_results.csv
-    python scripts/part_b/verify_wilcoxon.py \
-        --csv exp_b1_results.csv --dataset drive --alpha 0.001
+  python verify_wilcoxon.py
+  python verify_wilcoxon.py --csv results/part_b/exp_b1_results.csv
+  python verify_wilcoxon.py --csv exp_b1_results.csv --dataset drive --alpha 0.001
 """
-
 from __future__ import annotations
 
 import argparse
@@ -29,16 +25,24 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
+# ─────────────────────────────────────────────────────────────────────────────
+# Test Definition Table
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Each entry: (label, metric, x_prep, y_prep, alternative, note)
+#
+# 'less' direction:
 #   wilcoxon(x, y, alternative='less') → H1: median(x-y) < 0 → x < y
-
+#   Here x=ddfp, y=baseline (for metrics where lower is better: CC, TSI, DWC)
+#   Or x=baseline, y=ddfp (for metrics where higher is better: b0_cons)
+#
 TESTS: list[dict] = [
     # ── CC ──────────────────────────────────────────────────────────────────
     {
         "label":     "CC  ddfp < no_interp",
         "metric":    "CC",
         "col":       "cc",
-        "x_prep":    "ddfp",
+        "x_prep":    "ddfp",           # x = ddfp  (lower is better)
         "y_prep":    "no_interp",      # y = baseline
         "alt":       "less",           # H1: ddfp < no_interp
         "note":      "anti-diagonal CC violations in no_interp",
@@ -54,12 +58,13 @@ TESTS: list[dict] = [
         "note":      "threshold-sensitive β₀ in naive_interp",
     },
     # ── b0_consistency ──────────────────────────────────────────────────────
+    # b0_cons: higher is better → no_interp < ddfp
     {
         "label":     "b0_cons no_interp < ddfp",
         "metric":    "b0_consistency",
         "col":       "b0_consistency",
-        "x_prep":    "no_interp",
-        "y_prep":    "ddfp",
+        "x_prep":    "no_interp",      # x = no_interp (lower side)
+        "y_prep":    "ddfp",           # y = ddfp      (higher side)
         "alt":       "less",           # H1: no_interp < ddfp
         "note":      "β₀⁸/β₀⁴ ratio; DWC → ratio=1, violation → ratio<<1",
     },
@@ -74,8 +79,6 @@ TESTS: list[dict] = [
         "note":      "pixel-level DWC violation rate; ddfp=0 by construction",
     },
     # ── chi_sign_flip ────────────────────────────────────────────────────────
-    # ddfp: 0/20 (0%), naive_interp: 19/20 (95%)
-    # ddfp < naive_interp
     {
         "label":     "χ_flip ddfp < naive_interp",
         "metric":    "chi_sign_flip",
@@ -88,6 +91,10 @@ TESTS: list[dict] = [
 ]
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Core Statistical Test Function
+# ─────────────────────────────────────────────────────────────────────────────
+
 def run_wilcoxon(
     x: np.ndarray,
     y: np.ndarray,
@@ -99,9 +106,9 @@ def run_wilcoxon(
 
     Parameters
     ----------
-    x, y        : paired observations (same sample, different preprocessing)
+    x, y        : Paired observations (same sample, different preprocessing)
     alternative : 'less' | 'greater' | 'two-sided'
-    zero_method : 'wilcox' (scipy default; ties at 0 excluded)
+    zero_method : 'wilcox' (scipy default, zeros are discarded)
 
     Returns
     -------
@@ -113,11 +120,13 @@ def run_wilcoxon(
     y = np.asarray(y, dtype=float)
     n = len(x)
 
+    # All identical → Cannot compute test
     if np.allclose(x, y):
         return {"W": None, "pvalue": None, "n": n,
                 "n_effective": 0, "significant": False,
                 "note": "all_ties (x≡y)"}
 
+    # Number of effective pairs (difference ≠ 0)
     diffs = x - y
     n_eff = int(np.sum(diffs != 0))
 
@@ -139,10 +148,13 @@ def run_wilcoxon(
                 "note": str(e)}
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Descriptive Statistics
+# ─────────────────────────────────────────────────────────────────────────────
+
 def descriptive_stats(df: pd.DataFrame, col: str, dataset: str) -> pd.DataFrame:
-    """Descriptive statistics for a given metric, grouped by preprocessing."""
+    """Descriptive statistics by preprocessing method for a given metric."""
     sub = df[df["dataset"] == dataset] if "dataset" in df.columns else df
-    print("sub:", sub.head())
     rows = []
     for prep in ["no_interp", "naive_interp", "ddfp"]:
         vals = sub[sub["preprocessing"] == prep][col].values
@@ -160,18 +172,19 @@ def descriptive_stats(df: pd.DataFrame, col: str, dataset: str) -> pd.DataFrame:
     return pd.DataFrame(rows).set_index("preprocessing")
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Main Report / Verification
+# ─────────────────────────────────────────────────────────────────────────────
+
 def run_verification(
     csv_path: Path,
     dataset: str = "drive",
     alpha: float = 0.001,
-) -> bool:
+) -> None:
     """
-    Load CSV → descriptive statistics → Wilcoxon tests.
-
-    Returns
-    -------
-    df with W, p-value, etc.
+    Load CSV → Compute descriptive statistics → Print Wilcoxon test results.
     """
+    # ── Load Data ──────────────────────────────────────────────────────────
     df = pd.read_csv(csv_path)
     if "dataset" in df.columns:
         sub = df[df["dataset"] == dataset].copy()
@@ -183,7 +196,7 @@ def run_verification(
     preps_avail = set(sub["preprocessing"].unique())
 
     print("=" * 68)
-    print("DD-FP Part B — Wilcoxon Signed-Rank Verification Report")
+    print("DD-FP Part B — Wilcoxon Signed-Rank Test Report")
     print("=" * 68)
     print(f"  CSV        : {csv_path}")
     print(f"  Dataset    : {dataset.upper()}  (N={n_samples} samples)")
@@ -192,6 +205,7 @@ def run_verification(
     print(f"  scipy.stats.wilcoxon — one-sided paired test")
     print()
 
+    # ── Descriptive Statistics ─────────────────────────────────────────────
     print("── Descriptive Statistics ──────────────────────────────────────")
     for col, label in [
         ("cc",             "CC  (Cross-Connectivity, ↓ better)"),
@@ -207,11 +221,11 @@ def run_verification(
         print(stats.to_string())
     print()
 
+    # ── Wilcoxon Tests ─────────────────────────────────────────────────────
     print("── Wilcoxon Signed-Rank Tests ──────────────────────────────────")
     print(f"  H₁: x < y  (one-sided less, paired by sample)")
     print()
 
-    all_pass = True
     results_rows = []
 
     for t in TESTS:
@@ -223,6 +237,7 @@ def run_verification(
             print(f"  [SKIP] {t['label']} — preprocessing not found")
             continue
 
+        # Sort by sample to ensure proper paired comparison
         x_df = (sub[sub["preprocessing"] == t["x_prep"]]
                 .sort_values("sample" if "sample" in sub.columns else sub.index.name)
                 [[col]].rename(columns={col: "x"}))
@@ -235,12 +250,11 @@ def run_verification(
 
         res = run_wilcoxon(x_vals, y_vals, alternative=t["alt"])
 
-        _pass = (
-            res["significant"] and
-            res["pvalue"] is not None and
-            res["pvalue"] < alpha
-        )
-        verdict = "✅ PASS" if _pass else "⚠  FAIL"
+        # Determine significance
+        is_significant = res["pvalue"] is not None and res["pvalue"] < alpha
+        verdict = "✅ SIGNIFICANT" if is_significant else "⚠ NOT SIGNIFICANT"
+
+        # Output
         W_str = f"{res['W']:.1f}" if res["W"] is not None else "N/A"
         p_str = f"{res['pvalue']:.2e}" if res["pvalue"] is not None else "N/A"
         neff  = res["n_effective"]
@@ -263,14 +277,21 @@ def run_verification(
             "N_eff":       neff,
             "W":           res["W"],
             "pvalue":      res["pvalue"],
-            "significant": res["significant"],
+            "significant": is_significant,
             "note":        res["note"],
         })
 
-    return pd.DataFrame(results_rows)
+    # ── Final Summary ──────────────────────────────────────────────────────
+    print("── Summary ─────────────────────────────────────────────────────")
+    n_sig = sum(r["significant"] for r in results_rows)
+    n_total = len(results_rows)
+    print(f"  {n_sig}/{n_total} tests are statistically significant at α={alpha}")
+    print()
 
 
+# ─────────────────────────────────────────────────────────────────────────────
 # CLI
+# ─────────────────────────────────────────────────────────────────────────────
 
 def _parse() -> argparse.Namespace:
     p = argparse.ArgumentParser(
@@ -279,23 +300,18 @@ def _parse() -> argparse.Namespace:
     p.add_argument(
         "--csv",
         default="results/part_b/exp_b1_results.csv",
-        help="path to exp_b1 results CSV (default: results/part_b/exp_b1_results.csv)",
+        help="Path to exp_b1 results CSV (default: results/part_b/exp_b1_results.csv)",
     )
     p.add_argument(
         "--dataset",
         default="drive",
-        help="dataset to verify (default: drive)",
+        help="Dataset to verify (default: drive)",
     )
     p.add_argument(
         "--alpha",
         type=float,
         default=0.001,
-        help="significance level alpha (default: 0.001)",
-    )
-    p.add_argument(
-        "--csv-out",
-        default=None,
-        help="path to output CSV (default: None)",
+        help="Significance level (default: 0.001)",
     )
     return p.parse_args()
 
@@ -307,7 +323,5 @@ if __name__ == "__main__":
         print(f"[ERROR] CSV not found: {csv_path}")
         sys.exit(1)
 
-    df = run_verification(csv_path, dataset=args.dataset, alpha=args.alpha)
-    if args.csv_out:
-        df.to_csv(args.csv_out, index=False)
-        print(f"[INFO] Results saved to: {args.csv_out}")   
+    run_verification(csv_path, dataset=args.dataset, alpha=args.alpha)
+    sys.exit(0)
