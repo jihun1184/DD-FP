@@ -254,7 +254,6 @@ def wilcoxon_test(x: list, y: list, label: str = "") -> dict:
 # Main
 
 def main(args: argparse.Namespace) -> None:
-    ref_csv: Path | None = getattr(args, "ref_csv", None)
     cfg = SimpleNamespace(preprocessing=SimpleNamespace(
         type="ddfp",
         naive_mode="bilinear",
@@ -426,8 +425,6 @@ def _print_summary(rows: list) -> None:
                           f"W={w:>5}  p={pval}  {sig}  {match}{note}")
 
     print("\n" + "─" * 70)
-    ref_label = f"(ref: {ref_csv.name})" if ref_csv is not None else "(no --ref-csv provided)"
-    print(f"Current run vs reference comparison  {ref_label}")
     print("─" * 70)
     drive_rows = [r for r in rows if r["dataset"] == "drive"]
     if drive_rows:
@@ -445,27 +442,6 @@ def _print_summary(rows: list) -> None:
         # Load reference values from a previous run CSV if provided.
         # Expected columns: preprocessing, dataset, tsi, cc, b0_consistency, chi_sign_flip
         ref_vals: dict = {}
-        if ref_csv is not None:
-            try:
-                import csv as _csv
-                with open(ref_csv, newline="") as _f:
-                    _ref_rows = [r for r in _csv.DictReader(_f)
-                                 if r.get("dataset", "drive") == "drive"]
-                def _ref_mean(prep, col):
-                    vals = [float(r[col]) for r in _ref_rows
-                            if r.get("preprocessing") == prep and r.get(col) not in (None, "", "None")]
-                    return round(np.mean(vals), 4) if vals else None
-                ref_vals = {
-                    "naive_tsi": _ref_mean("naive_interp", "tsi"),
-                    "ddfp_tsi":  _ref_mean("ddfp",         "tsi"),
-                    "no_cc":     _ref_mean("no_interp",    "cc"),
-                    "naive_b0":  _ref_mean("naive_interp", "b0_consistency"),
-                    "naive_flip":_ref_mean("naive_interp", "chi_sign_flip"),
-                }
-                print(f"  [B1] Reference values loaded from {ref_csv}")
-            except Exception as _e:
-                print(f"  [B1] Could not load ref CSV ({_e}); skipping reference column.")
-
         def _ref_str(key, fmt=".2f"):
             v = ref_vals.get(key)
             return f"{v:{fmt}}" if v is not None else "N/A"

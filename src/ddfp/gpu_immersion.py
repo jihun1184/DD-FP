@@ -203,12 +203,28 @@ _FP_KERNEL_CODE = r"""
 extern "C" {
 
 /*
- * fp_bfs_step: Front Propagation BFS one step.
+ * fp_bfs_step  (Direction-A fix)
  *
  * Scan 6-dir neighbors of frontier pixels (frontier[i]==1).
  * Compute snap(cur_level, U_lo[nb], U_hi[nb]) for unvisited neighbors.
- * If snap==cur_level: visit immediately (same-level spread).
- * If snap!=cur_level: deferred (handled in that level sweep).
+ * If snap==cur_level: confirm visit immediately (same-level BFS spread).
+ * If snap!=cur_level: do NOT pre-write u_dwc (deferred hint removed).
+ *
+ * Direction-A rationale
+ * ---------------------
+ * The original implementation pre-wrote u_dwc[nidx]=snapped for
+ * snap!=cur_level cells while leaving visited=0.  When two frontier
+ * cells reached the same unvisited cell from different paths, they
+ * could race and write different snapped values.  For cells with a
+ * wide [U_lo, U_hi] interval (e.g. binary {0,255} masks), different
+ * snap results are all within-interval-valid, but if the antagonist
+ * pair of a face-block receives values from different races the DWC
+ * interval-intersection condition can fail.
+ *
+ * Fix: remove the deferred pre-write entirely.  fp_activate_level
+ * re-derives snap from U_lo/U_hi at the correct level; no per-cell
+ * hint is needed.  The only cost is the O(N) activate scan per level,
+ * which was already present.
  *
  * snap(l, lo, hi):
  *   l < lo -> lo  (snap-up)
@@ -220,10 +236,10 @@ __global__ void fp_bfs_step(
     const float* U_hi,
     float*       u_dwc,     // output: confirmed level per pixel
     int*         visited,   // 0=unvisited, 1=visited
-    const int*   frontier,  // current frontier (read-only)
+    const int*   frontier,  // current frontier (read-only this kernel)
     int*         next_front,// next frontier candidates (write)
     int*         changed,   // whether any change occurred
-    int          cur_level, // current BFS level (int, [V_MIN..V_MAX])
+    int          cur_level,
     int          V_MIN,
     int          Wp, int Hp, int Dp
 ) {
@@ -232,14 +248,11 @@ __global__ void fp_bfs_step(
     if (idx >= N) return;
     if (!frontier[idx]) return;
 
-    // Recover 3D coords from flat C-order index (x fastest)
-    // Storage: flat = x + y*Wp + z*Wp*Hp
     int z = idx / (Wp * Hp);
     int r = idx % (Wp * Hp);
     int y = r / Wp;
     int x = r % Wp;
 
-    // 6-direction neighbors
     const int dx[6] = {-1, 1,  0, 0,  0, 0};
     const int dy[6] = { 0, 0, -1, 1,  0, 0};
     const int dz[6] = { 0, 0,  0, 0, -1, 1};
@@ -254,60 +267,64 @@ __global__ void fp_bfs_step(
         int nidx = nx + ny * Wp + nz * Wp * Hp;
         if (visited[nidx]) continue;
 
-        // snap(cur_level, U_lo[nidx], U_hi[nidx])
         float lo  = U_lo[nidx];
         float hi  = U_hi[nidx];
         float lv  = (float)cur_level;
-        float snapped = (lv < lo) ? lo : (lv > hi) ? hi : lv;
-        int   snapped_i = __float2int_rn(snapped);   // round-to-nearest
+        float snapped   = (lv < lo) ? lo : (lv > hi) ? hi : lv;
+        int   snapped_i = __float2int_rn(snapped);
 
         if (snapped_i == cur_level) {
-            // Same level: confirm visit immediately
+            // Same level: confirm visit immediately via atomicCAS.
+            // Multiple threads may race on the same nidx; atomicCAS
+            // ensures exactly one thread commits (idempotent winner).
             if (atomicCAS(&visited[nidx], 0, 1) == 0) {
                 u_dwc[nidx]      = snapped;
                 next_front[nidx] = 1;
                 *changed         = 1;
             }
-        } else {
-            // Different level (snap_level): deferred hint
-            // Pre-write snap result so fp_activate_level can use it
-            // without full scan at the target level sweep.
-            // atomicCAS(visited,0,0)==0: only write if still unvisited.
-            // u_dwc is NaN-initialized; overwriting hint is safe.
-            if (atomicCAS(&visited[nidx], 0, 0) == 0) {
-                // Multiple neighbors may race but snapped is within interval
-                // so any winner is valid (no DWC violation).
-                // (Algorithm 1: priority_push preserves only snap result)
-                u_dwc[nidx] = snapped;  // visited=0, deferred hint
-            }
         }
+        // snap != cur_level: no pre-write.  fp_activate_level will
+        // handle this cell when the sweep reaches its snap level.
     }
 }
 
 /*
- * fp_activate_level (v2)
+ * fp_activate_level  (Direction-A fix)
  *
- * Confirm unvisited pixels that should be visited at cur_level.
+ * Confirm unvisited pixels whose snap(cur_level, U_lo, U_hi)==cur_level
+ * and that have at least one visited neighbour.
  *
- * [Opt 1] Use deferred hint from fp_bfs_step:
- *   fp_bfs_step pre-wrote u_dwc[idx]=snapped,
- *   confirm pixels where snap==cur_level without full scan.
- *   O(N) single pass.
+ * Direction-A changes vs original
+ * --------------------------------
+ * 1. Output buffer: writes to new_front[], NOT frontier[].
+ *    The original wrote frontier[idx]=1 directly, exposing newly-activated
+ *    cells to the fp_bfs_step kernel in the SAME iteration.  That caused
+ *    fp_bfs_step to expand neighbours of cells that had just been activated
+ *    by fp_activate_level in the same kernel launch -- equivalent to a
+ *    0-latency frontier expansion that is not present in Algorithm S1.
+ *    Writing to new_front[] keeps the two roles separate:
+ *      fp_activate_level -> produces new_front_activate
+ *      fp_bfs_step       -> reads frontier (prev iter), produces next_front
+ *    Python merges both into frontier for the next iteration.
  *
- * [Opt 2] Explicit snap-down support (self-duality key):
- *   U_hi[idx]==cur_level: assign via snap-down at this level.
- *   Original code only checked lo<=lv<=hi; snap-down pixels
- *   arriving from cur_level>l_inf direction must be handled.
+ * 2. Connectivity check: reads only visited[] (not frontier[]).
+ *    The original checked visited[nidx] || frontier[nidx].  Reading
+ *    frontier[] here pulled in cells that fp_activate_level itself
+ *    had just written in the same kernel launch (intra-kernel race).
+ *    Reading only visited[] -- which is only set via atomicCAS and
+ *    never cleared -- gives a stable, race-free connectivity check.
  *
- * [Opt 3] Maintain neighbor-visited condition:
- *   Only activate if a neighbor is visited (connectivity).
+ * 3. No deferred hint: since fp_bfs_step no longer pre-writes u_dwc
+ *    for snap!=cur_level cells, this kernel re-derives snap from
+ *    U_lo/U_hi directly, which is always correct.
  */
 __global__ void fp_activate_level(
     const float* U_lo,
     const float* U_hi,
     float*       u_dwc,
     int*         visited,
-    int*         frontier,
+    const int*   frontier,   // read-only: previous iteration frontier
+    int*         new_front,  // write-only: cells activated this call
     int*         changed,
     int          cur_level,
     int          Wp, int Hp, int Dp
@@ -326,33 +343,28 @@ __global__ void fp_activate_level(
     const int dy[6] = { 0, 0, -1, 1,  0, 0};
     const int dz[6] = { 0, 0,  0, 0, -1, 1};
 
-    // Activate if neighbor is visited OR in frontier
-    // frontier included: pixels just visited at same level count
-    // (old: visited-only -> missed same-level simultaneous visit)
-    bool has_active_nb = false;
+    // Activate only if a confirmed (visited) neighbour exists.
+    // Do NOT check frontier[] to avoid intra-kernel write/read races.
+    bool has_visited_nb = false;
     for (int d = 0; d < 6; d++) {
         int nx = x + dx[d], ny = y + dy[d], nz = z + dz[d];
         if (nx < 0 || nx >= Wp || ny < 0 || ny >= Hp || nz < 0 || nz >= Dp)
             continue;
-        int nidx = nx + ny*Wp + nz*Wp*Hp;
-        if (visited[nidx] || frontier[nidx]) { has_active_nb = true; break; }
+        if (visited[nx + ny*Wp + nz*Wp*Hp]) { has_visited_nb = true; break; }
     }
-    if (!has_active_nb) return;
+    if (!has_visited_nb) return;
 
     float lo  = U_lo[idx];
     float hi  = U_hi[idx];
     float lv  = (float)cur_level;
-
-    // compute snap(cur_level, lo, hi)
-    float snapped = (lv < lo) ? lo : (lv > hi) ? hi : lv;
+    float snapped   = (lv < lo) ? lo : (lv > hi) ? hi : lv;
     int   snapped_i = __float2int_rn(snapped);
 
     if (snapped_i == cur_level) {
-        // Confirm visit at this level
         if (atomicCAS(&visited[idx], 0, 1) == 0) {
-            u_dwc[idx]    = snapped;  // snap result: lo, hi, or lv
-            frontier[idx] = 1;
-            *changed      = 1;
+            u_dwc[idx]     = snapped;
+            new_front[idx] = 1;   // separate buffer: no frontier[] write
+            *changed       = 1;
         }
     }
 }
@@ -363,6 +375,12 @@ __global__ void fp_activate_level(
 _fp_mod    = None
 _k_bfs     = None
 _k_activate= None
+
+def _reset_fp_kernel_cache() -> None:
+    """Force recompilation on next _get_fp_kernels() call.
+    Call this after upgrading gpu_immersion.py at runtime."""
+    global _fp_mod, _k_bfs, _k_activate
+    _fp_mod = _k_bfs = _k_activate = None
 
 def _get_fp_kernels():
     global _fp_mod, _k_bfs, _k_activate
@@ -438,11 +456,11 @@ def front_propagation_gpu(
     V_MAX = int(cp.ceil(U_hi_f.max()).item())
     n_levels = V_MAX - V_MIN + 1
 
-    v_mid = (V_MIN + V_MAX) / 2.0
-    if l_inf <= v_mid:
-        sweep_levels = list(range(V_MIN, V_MAX + 1))
-    else:
-        sweep_levels = list(range(V_MAX, V_MIN - 1, -1))
+    # Algorithm S1 requires a strict ascending level sweep (V_min → V_max)
+    # so that snap monotonicity (Lemma 3.7) is preserved.  The original
+    # descending branch was dead code for all uint8 inputs with l_inf=0
+    # but could trigger on non-standard l_inf values.
+    sweep_levels = list(range(V_MIN, V_MAX + 1))
 
     l_inf_rounded = int(round(l_inf))
     l_inf_clamped = max(V_MIN, min(V_MAX, l_inf_rounded))
@@ -488,11 +506,17 @@ def front_propagation_gpu(
         for _ in range(max_inner):
             changed[0] = 0
 
+            # Direction-A: fp_activate_level writes to new_front_activate
+            # (separate buffer), not to frontier[].
+            new_front_activate = cp.zeros(N, dtype=cp.int32)
             k_activate(
                 (grid,), (block,),
-                (U_lo_f, U_hi_f, u_dwc_f, visited, frontier, changed, lv, Wp, Hp, Dp)
+                (U_lo_f, U_hi_f, u_dwc_f, visited, frontier,
+                 new_front_activate, changed, lv, Wp, Hp, Dp)
             )
 
+            # fp_bfs_step reads frontier (previous iter) and writes next_front.
+            # No deferred hint write — only same-level cells enter next_front.
             next_front = cp.zeros(N, dtype=cp.int32)
             k_bfs(
                 (grid,), (block,),
@@ -500,7 +524,9 @@ def front_propagation_gpu(
                  changed, lv, V_MIN, Wp, Hp, Dp)
             )
 
-            frontier = next_front
+            # Merge: frontier for next BFS step = activate output ∪ bfs output.
+            # Both buffers are {0,1}; bitwise-OR is equivalent to set union.
+            frontier = cp.bitwise_or(next_front, new_front_activate)
             cp.cuda.Stream.null.synchronize()
 
             if changed[0].item() == 0:

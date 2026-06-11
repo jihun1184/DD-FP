@@ -19,16 +19,16 @@ Single-config run (e.g. K=16, δ=1 only):
 
 Usage:
   # Full sweep (all K, both delta)
-  python scripts/extras/run_epsilon_sensitivity.py \\
+  python scripts/analysis/run_epsilon_sensitivity.py \\
       --brats /path/to/BraTS2021_Training_Data
 
   # Partial (K=16 only, both delta)
-  python scripts/extras/run_epsilon_sensitivity.py \\
+  python scripts/analysis/run_epsilon_sensitivity.py \\
       --brats /path/to/BraTS2021_Training_Data \\
       --K_list 16 --delta_list 1 2
 
   # Resume / append: completed results are loaded and skipped
-  python scripts/extras/run_epsilon_sensitivity.py \\
+  python scripts/analysis/run_epsilon_sensitivity.py \\
       --brats /path/to/BraTS2021_Training_Data \\
       --out epsilon_sensitivity_full.json   # existing file → auto-skip
 

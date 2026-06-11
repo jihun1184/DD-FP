@@ -16,6 +16,7 @@ htmlcov/
 .tox/
 
 # ── Data (not committed — download separately) ────────────────────────────────
+data/
 data/BraTS2021/
 data/DRIVE/
 data/CREMI/masks/
@@ -28,7 +29,6 @@ scripts/walltime
 # ── Timing CSVs (provided as release assets) ─────────────────────────────────
 timing_*.csv
 *.json
-data/
 
 # ── Jupyter / IPython ────────────────────────────────────────────────────────
 .ipynb_checkpoints/

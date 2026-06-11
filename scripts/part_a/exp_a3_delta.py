@@ -186,7 +186,6 @@ def run_ibi_v10(vol_u8: np.ndarray, K: int, delta: int,
         "t_total_s": time.time() - t0,
     }
 
-
 def _count_boundary_violations(u_inner: np.ndarray,
                                 boundary_z_orig: list[int]) -> int:
     """Verbatim from experiment_DDFP.count_boundary_violations()."""
@@ -397,6 +396,12 @@ def _plot_time(rows, out_dir):
     fig.savefig(path, dpi=300, bbox_inches="tight"); plt.close(fig)
     print(f"  Plot -> {path}")
 
-
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Exp A3: Synthetic Data delta sensitivity")
+    p.add_argument("--out-dir", type=Path, default=ROOT / "results" / "part_a",
+                   help="Output directory (default: ROOT/results/part_a)")
+    return p.parse_args()
+    
 if __name__ == "__main__":
-    run_a3(ROOT / "results" / "part_a")
+    args = _parse_args()
+    run_a3(args.out_dir)

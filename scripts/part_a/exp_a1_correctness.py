@@ -47,22 +47,11 @@ def ddfp_interp_3d(vol_u8):
 
 
 def no_interp_3d(vol_u8):
-    """3D no_interp: max-of-neighbours at every non-0-cell position."""
+    from scipy.ndimage import zoom as ndimage_zoom
     s = vol_u8.astype(np.float32)
     W, H, D = s.shape
-    u = np.zeros((2*W-1, 2*H-1, 2*D-1), dtype=np.float32)
-    u[::2, ::2, ::2] = s
-    u[1::2, ::2,  ::2]  = np.maximum(s[:-1,:,:], s[1:,:,:])
-    u[::2,  1::2, ::2]  = np.maximum(s[:,:-1,:], s[:,1:,:])
-    u[::2,  ::2,  1::2] = np.maximum(s[:,:,:-1], s[:,:,1:])
-    mm4 = lambda a,b,c,d: np.maximum(np.maximum(a,b), np.maximum(c,d))
-    u[1::2,1::2,::2]  = mm4(s[:-1,:-1,:],s[1:,:-1,:],s[:-1,1:,:],s[1:,1:,:])
-    u[1::2,::2,1::2]  = mm4(s[:-1,:,:-1],s[1:,:,:-1],s[:-1,:,1:],s[1:,:,1:])
-    u[::2,1::2,1::2]  = mm4(s[:,:-1,:-1],s[:,1:,:-1],s[:,:-1,1:],s[:,1:,1:])
-    c8 = np.stack([s[:-1,:-1,:-1],s[1:,:-1,:-1],s[:-1,1:,:-1],s[1:,1:,:-1],
-                   s[:-1,:-1,1:], s[1:,:-1,1:], s[:-1,1:,1:], s[1:,1:,1:]])
-    u[1::2,1::2,1::2] = c8.max(0)
-    return u
+    factors = ((2*W-1)/W, (2*H-1)/H, (2*D-1)/D)
+    return ndimage_zoom(s, factors, order=0, prefilter=False)
 
 
 def naive_interp_3d(vol_u8):
@@ -78,7 +67,6 @@ def run_a1(out_dir):
     prep_no    = NoInterpPreprocessor(_make_cfg("no_interp"))
     prep_naive = NaiveInterpPreprocessor(_make_cfg("naive_interp"))
 
-    csv_path   = out_dir / "a1_correctness.csv"
     fieldnames = ["image_id","ndim","orig_shape","method",
                   "n_violations","max_abs_error","violation_rate","time_s","dwc_ok"]
     rows        = []
@@ -160,6 +148,12 @@ def run_a1(out_dir):
     if ddfp_rows and not ddfp_all_ok:
         raise AssertionError("A1 FAILED: DD-FP produced DWC violations!")
 
-
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Exp A1: Synthetic Data DWC Correctness")
+    p.add_argument("--out-dir", type=Path, default=ROOT / "results" / "part_a",
+                   help="Output directory (default: ROOT/results/part_a)")
+    return p.parse_args()
+    
 if __name__ == "__main__":
-    run_a1(ROOT / "results" / "part_a")
+    args = _parse_args()
+    run_a1(args.out_dir)

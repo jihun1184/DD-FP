@@ -1,5 +1,5 @@
 """
-scripts/extras/analyse_epsilon.py
+scripts/analysis/analyse_epsilon.py
 ==================================
 Block C (Tier-1) — IBI convergence tolerance ε sensitivity analysis.
 

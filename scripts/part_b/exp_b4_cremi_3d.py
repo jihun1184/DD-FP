@@ -114,23 +114,12 @@ def topology_metrics_3d(interp: np.ndarray, ref_b0: int, ref_chi: int) -> dict:
 
 # 3D interpolation (CPU-only)
 
-def no_interp_3d(vol_bin: np.ndarray) -> np.ndarray:
-    """Binary max-of-neighbours on Khalimsky grid. Output: {0,1} float32."""
-    s = vol_bin.astype(np.float32)
-    D, H, W = s.shape
-    u = np.zeros((2*D-1, 2*H-1, 2*W-1), dtype=np.float32)
-    u[::2,::2,::2] = s
-    u[1::2,::2, ::2]  = np.maximum(s[:-1,:,:], s[1:,:,:])
-    u[::2, 1::2,::2]  = np.maximum(s[:,:-1,:], s[:,1:,:])
-    u[::2, ::2, 1::2] = np.maximum(s[:,:,:-1], s[:,:,1:])
-    mm4 = lambda a,b,c,d: np.maximum(np.maximum(a,b), np.maximum(c,d))
-    u[1::2,1::2,::2]  = mm4(s[:-1,:-1,:],s[1:,:-1,:],s[:-1,1:,:],s[1:,1:,:])
-    u[1::2,::2,1::2]  = mm4(s[:-1,:,:-1],s[1:,:,:-1],s[:-1,:,1:],s[1:,:,1:])
-    u[::2,1::2,1::2]  = mm4(s[:,:-1,:-1],s[:,1:,:-1],s[:,:-1,1:],s[:,1:,1:])
-    c8 = np.stack([s[:-1,:-1,:-1],s[1:,:-1,:-1],s[:-1,1:,:-1],s[1:,1:,:-1],
-                   s[:-1,:-1,1:], s[1:,:-1,1:], s[:-1,1:,1:], s[1:,1:,1:]])
-    u[1::2,1::2,1::2] = c8.max(axis=0)
-    return u
+def no_interp_3d(vol_u8):
+    from scipy.ndimage import zoom as ndimage_zoom
+    s = vol_u8.astype(np.float32)
+    W, H, D = s.shape
+    factors = ((2*W-1)/W, (2*H-1)/H, (2*D-1)/D)
+    return ndimage_zoom(s, factors, order=0, prefilter=False)
 
 
 def naive_interp_3d(vol_bin: np.ndarray) -> np.ndarray:

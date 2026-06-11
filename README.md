@@ -44,11 +44,10 @@ dd-fp/
 │   ├── preprocess/                   # One-time dataset preparation (not in scripts.zip)
 │   │   └── prepare_cremi.py          # CREMI HDF5 → 2-D PNG masks
 │   │
-│   └── analysis/                     # Supplementary analysis (TIPS, ε sensitivity, validation)
+│   └── analysis/                     # Supplementary analysis (TIPS, ε sensitivity)
 │       ├── tips.py                   # TIPS (eq:tips): N=20 paper values + N=1,251 full sweep
 │       ├── run_epsilon_sensitivity.py# E-NEW-4: ε ∈ {0.1,0.5,1.0,2.0} sweep
-│       ├── analyse_epsilon.py        # Kruskal-Wallis H=0, p=1.0 (sec:enew4)
-│       └── validate_dwc.py           # NaN fallback H1/H2/H3 (Supplement S8)
+│       └── analyse_epsilon.py        # Kruskal-Wallis H=0, p=1.0 (sec:enew4)
 │
 ├── test/
 │   ├── conftest.py                   # pytest option: --run-gpu
@@ -325,6 +324,8 @@ Backend selection (GPU vs CPU) is automatic and happens once at import time.
 | System RAM | 24 GB DDR5 |
 
 Full environment details are provided in Supplement S8 of the paper.
+
+> **Note on `validate_dwc.py`:** This script was removed. DWC correctness is verified directly by the experiment scripts (`exp_a1_correctness.py`, `exp_b1_topology_accuracy.py`, etc.) via `src/utils/benchmark_utils.py:verify_dwc`, which is the authoritative source for the violation-rate numbers in Tab. 2–5.
 
 ---
 

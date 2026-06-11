@@ -1,5 +1,5 @@
 """
-scripts/extras/tips.py
+scripts/analysis/tips.py
 =======================
 Topological Integrity per Second (TIPS) measurement.
 Implements paper eq:tips and reproduces tab:speedup.
@@ -24,15 +24,15 @@ Scalability
 Usage
 -----
   # Reproduce tab:speedup (N=20, with CPU)
-  python scripts/extras/tips.py \\
+  python scripts/analysis/tips.py \\
       --brats data/BraTS2021 --n 20 --seed 42
 
   # Full dataset TIPS, GPU only (~87 min)
-  python scripts/extras/tips.py \\
+  python scripts/analysis/tips.py \\
       --brats data/BraTS2021 --n 1251 --seed 42 --skip-cpu
 
   # Quick smoke-test (5 subjects, GPU only)
-  python scripts/extras/tips.py \\
+  python scripts/analysis/tips.py \\
       --brats data/BraTS2021 --n 5 --skip-cpu --K 16
 
 Notes

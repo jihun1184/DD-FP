@@ -246,14 +246,14 @@ def _load_brats_ref_rows(
     ]
 
 
-SIZES_2D = [256, 512, 1024, 2048]
-SIZES_3D = [64, 128, 256]
+SIZES_2D = [128, 256, 512]
+SIZES_3D = [32, 64, 128]
 N_REPEATS = 5
 WARMUP    = 1
 
 # Sizes where seq_cpu is too slow to run (skip gracefully)
 SEQ_CPU_SIZE_LIMIT_2D = 512     # >512^2: skip seq_cpu
-SEQ_CPU_SIZE_LIMIT_3D = 64      # >64^3: skip seq_cpu
+SEQ_CPU_SIZE_LIMIT_3D = 128     # >128^3: skip seq_cpu
 
 
 def run_a2(
@@ -347,17 +347,6 @@ def run_a2(
     print("\n  --- 3D ---")
     for s in SIZES_3D:
         _measure(3, s, generate_synthetic_volume((s, s, s), seed=42))
-
-    # 512^3 OOM guard
-    print(f"\n  [512^3]  attempting (may OOM)...")
-    try:
-        _measure(3, 512, generate_synthetic_volume((512, 512, 512), seed=42))
-    except MemoryError:
-        print("    skipped (host OOM)")
-        rows.append({"ndim":3,"size":512,"n_voxels":512**3,
-                     "t_seq_cpu_s":None,"t_par_cpu_s":None,"t_gpu_s":None,
-                     "speedup_par_vs_seq":None,"speedup_gpu_vs_seq":None,
-                     "note":"host_OOM"})
 
     # Append BraTS reference rows
     brats_ref = _load_brats_ref_rows(timing_n100_csv, timing_k16_csv)
