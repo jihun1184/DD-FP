@@ -20,12 +20,6 @@ Analysis
   Report b: expect b ~ 1.0 (linear scaling)
   If b > 1.2: flag as super-linear
 
-BraTS reference point
----------------------
-  Loaded from timing_n100.csv (--timing-n100-csv).
-  Column used: t_gpu1_s  (GPU single-pass K=1, N subjects, median).
-  Shape: 240x240x155 = 8.9M voxels.
-
 Output
 ------
   results/part_a/a4_scalability.csv
@@ -39,7 +33,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import statistics
 import sys
 from pathlib import Path
 
@@ -66,45 +59,6 @@ SIZES_2D = [256, 512, 1024, 2048, 4096]
 SIZES_3D = [64, 128, 256]      # 512^3 attempted with OOM guard
 N_REPEATS = 5
 WARMUP    = 1
-
-
-# ---------------------------------------------------------------------------
-# Load BraTS reference point from timing_n100.csv
-# ---------------------------------------------------------------------------
-
-def _load_brats_ref(timing_n100_csv: Path) -> dict:
-    """
-    Load the BraTS reference data point from timing_n100.csv.
-    Uses the median of t_gpu1_s (GPU single-pass K=1) across all subjects.
-    Raises FileNotFoundError if the file is missing.
-    """
-    if not timing_n100_csv.exists():
-        raise FileNotFoundError(
-            f"timing_n100.csv not found: {timing_n100_csv}\n"
-            "Generate it with scripts/walltime/gen_timing_n100.py"
-        )
-    with open(timing_n100_csv, newline="") as f:
-        rows = list(csv.DictReader(f))
-
-    gpu1_vals = [
-        float(r["t_gpu1_s"]) for r in rows
-        if r.get("t_gpu1_s") not in (None, "", "None")
-    ]
-    if not gpu1_vals:
-        raise ValueError(f"No valid t_gpu1_s values in {timing_n100_csv}")
-
-    t_gpu1_median = round(statistics.median(gpu1_vals), 3)
-    print(f"  [A4] Loaded {timing_n100_csv.name}: "
-          f"BraTS t_gpu1_s median={t_gpu1_median:.3f}s (N={len(gpu1_vals)})")
-
-    return {
-        "ndim": 3,
-        "size_str": "240x240x155",
-        "n_voxels": 240 * 240 * 155,
-        "time_s": t_gpu1_median,
-        "peak_memory_mb": None,
-        "source": f"{timing_n100_csv.name} (BraTS2021, N={len(gpu1_vals)} median)",
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -172,22 +126,15 @@ def _fit_scaling_exponent(n_voxels: list[int], times: list[float]) -> tuple[floa
 # Main
 # ---------------------------------------------------------------------------
 
-def run_a4(
-    out_dir: Path,
-    timing_n100_csv: Path | None = None,
-) -> None:
+def run_a4(out_dir: Path) -> None:
     """
     Parameters
     ----------
-    out_dir         : directory for CSV and PNG outputs
-    timing_n100_csv : path to timing_n100.csv (default: ROOT/timing_n100.csv)
+    out_dir : directory for CSV and PNG outputs
     """
     if not _CUPY_OK:
         print("[ERROR] Exp A4 requires CuPy/GPU. Skipping.")
         return
-
-    if timing_n100_csv is None:
-        timing_n100_csv = ROOT / "timing_n100.csv"
 
     out_dir.mkdir(parents=True, exist_ok=True)
     rows = []
@@ -271,21 +218,6 @@ def run_a4(
             "peak_memory_mb": None, "voxels_per_sec": None,
             "source": "skipped_OOM",
         })
-
-    # Append BraTS reference point (from timing_n100.csv)
-    brats_ref = _load_brats_ref(timing_n100_csv)
-    rows.append({
-        "ndim":            3,
-        "size":            240,
-        "shape":           brats_ref["size_str"],
-        "n_voxels":        brats_ref["n_voxels"],
-        "time_s":          brats_ref["time_s"],
-        "peak_memory_mb":  brats_ref["peak_memory_mb"],
-        "voxels_per_sec":  round(brats_ref["n_voxels"] / brats_ref["time_s"]),
-        "source":          brats_ref["source"],
-    })
-    print(f"\n  (+ BraTS ref: {brats_ref['size_str']}, "
-          f"t={brats_ref['time_s']}s from {timing_n100_csv.name})")
 
     # CSV
     csv_path = out_dir / "a4_scalability.csv"
@@ -396,14 +328,9 @@ def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Exp A4: Scalability Analysis")
     p.add_argument("--out-dir", type=Path, default=ROOT / "results" / "part_a",
                    help="Output directory (default: ROOT/results/part_a)")
-    p.add_argument("--timing-n100-csv", type=Path, default=None,
-                   help="Path to timing_n100.csv  [default: ROOT/timing_n100.csv]")
     return p.parse_args()
 
 
 if __name__ == "__main__":
     args = _parse_args()
-    run_a4(
-        out_dir=args.out_dir,
-        timing_n100_csv=args.timing_n100_csv,
-    )
+    run_a4(out_dir=args.out_dir)

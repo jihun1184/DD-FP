@@ -3,7 +3,7 @@ scripts/part_a/exp_a1_correctness.py
 Exp A1: DWC Correctness Verification
 """
 from __future__ import annotations
-import csv, sys, time
+import argparse, csv, sys, time
 from pathlib import Path
 from types import SimpleNamespace
 import numpy as np
@@ -64,6 +64,7 @@ def naive_interp_3d(vol_u8):
 
 def run_a1(out_dir):
     out_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = out_dir / "a1_correctness.csv"
     prep_no    = NoInterpPreprocessor(_make_cfg("no_interp"))
     prep_naive = NaiveInterpPreprocessor(_make_cfg("naive_interp"))
 

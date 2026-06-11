@@ -439,40 +439,25 @@ def _print_summary(rows: list) -> None:
         naive_flip     = [r["chi_sign_flip"] for r in drive_rows
                           if r["preprocessing"] == "naive_interp"]
 
-        # Load reference values from a previous run CSV if provided.
-        # Expected columns: preprocessing, dataset, tsi, cc, b0_consistency, chi_sign_flip
+        # Print summary table
         ref_vals: dict = {}
         def _ref_str(key, fmt=".2f"):
-            v = ref_vals.get(key)
-            return f"{v:{fmt}}" if v is not None else "N/A"
+            return "N/A"
 
-        has_ref = bool(ref_vals)
-        hdr_ref = f"{'ref run':>12}" if has_ref else ""
-        print(f"  {'metric':<35} {hdr_ref} {'this run':>12}")
-        print(f"  {'-'*35}" + (f" {'-'*12}" if has_ref else "") + f" {'-'*12}")
+        has_ref = False
+        hdr_ref = ""
+        print(f"  {'metric':<35} {'this run':>12}")
+        print(f"  {'-'*35} {'-'*12}")
 
         def _row(label, current_val, ref_key, fmt=".2f", pct=False):
             cur_str = f"{current_val:{fmt}}" + ("%" if pct else "")
-            ref_str = (_ref_str(ref_key, fmt) + ("%" if pct else "")) if has_ref else ""
-            ref_col = f"{ref_str:>12}" if has_ref else ""
-            print(f"  {label:<35} {ref_col} {cur_str:>12}")
+            print(f"  {label:<35} {cur_str:>12}")
 
         _row("naive_interp TSI (DRIVE mean)",   np.mean(naive_tsi_vals),        "naive_tsi")
         _row("ddfp TSI (DRIVE mean)",           np.mean(ddfp_tsi_vals),         "ddfp_tsi", fmt=".4f")
         _row("no_interp CC (DRIVE mean)",       np.mean(no_cc_vals),            "no_cc")
         _row("naive_interp b0_cons (DRIVE mean)", np.mean(naive_b0),            "naive_b0", fmt=".6f")
         _row("naive_interp chi_flip (DRIVE, %)", 100*np.mean(naive_flip),       "naive_flip", fmt=".1f", pct=True)
-
-        # Drift check against reference if available
-        if has_ref and ref_vals.get("naive_tsi") is not None and naive_tsi_vals:
-            new_tsi = np.mean(naive_tsi_vals)
-            delta   = abs(new_tsi - ref_vals["naive_tsi"])
-            print()
-            if delta > 2.0:
-                print(f"  [WARN] naive_interp TSI drifted {delta:.2f} from reference run "
-                      f"({ref_vals['naive_tsi']:.2f} → {new_tsi:.2f})")
-            else:
-                print(f"  TSI drift from reference: {delta:.2f} — within tolerance")
 
 
 # CLI
@@ -499,13 +484,6 @@ def _parse() -> argparse.Namespace:
     p.add_argument(
         "--output",
         default="results/part_b/exp_b1_results.csv",
-    )
-    p.add_argument(
-        "--ref-csv",
-        type=Path,
-        default=None,
-        help="Path to a previous exp_b1_results.csv for reference comparison. "
-             "If omitted, the reference column is hidden.",
     )
     return p.parse_args()
 

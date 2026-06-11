@@ -6,9 +6,9 @@ Exp A2: Wall-Clock Speedup
 Three implementations of DD-FP interpolation compared:
   1. seq_cpu  : build_ispan_cpu + fp_cpu  (Algorithm 1 priority-queue, single-threaded)
                 Source: experiment_DDFP.py fp_cpu()  -- same code as Table 6 baseline
-  2. par_cpu  : build_ispan_cpu only (vectorised numpy, no FP loop)
+  2. par_cpu  : build_ispan_cpu only (vectorized numpy, no FP loop)
                 Represents the pure Ispan construction cost without front-propagation.
-                Used as the "vectorised numpy baseline" in the speedup table.
+                Used as the "vectorized numpy baseline" in the speedup table.
   3. gpu      : build_ispan_gpu + front_propagation_gpu  (CuPy Level-BFS)
                 Source: gpu_immersion.py  -- same code as Table 6 GPU column
 """
@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import statistics
 import sys
 import time
 from collections import defaultdict
@@ -128,11 +127,11 @@ def _run_cpu_seq(vol: np.ndarray) -> None:
 
 
 # ---------------------------------------------------------------------------
-# CPU parallel: vectorised Ispan only (no FP loop)
+# CPU parallel: vectorized Ispan only (no FP loop)
 # ---------------------------------------------------------------------------
 
 def _run_cpu_par(vol: np.ndarray) -> None:
-    """Vectorised Ispan construction only (no priority-queue FP)."""
+    """Vectorized Ispan construction only (no priority-queue FP)."""
     vol3 = vol[:, :, np.newaxis] if vol.ndim == 2 else vol
     _build_ispan_cpu(vol3)
 
@@ -157,95 +156,6 @@ def _run_gpu(vol: np.ndarray) -> None:
     _ = cp.asnumpy(u_pad)
 
 
-# ---------------------------------------------------------------------------
-# BraTS reference rows — loaded from CSV files produced by gen_timing_n100.py.
-#
-# Required files (pass paths via CLI or run_a2()):
-#   timing_n100_csv  — seq_cpu + gpu1 (K=1) timings, N≥20 subjects
-#                      columns: t_cpu_s, t_gpu1_s
-#   timing_k16_csv   — DD-FP K=16 timings, N≥20 subjects
-#                      column:  t_dd_s
-#
-# Generate with:
-#   python scripts/walltime/gen_timing_n100.py --brats-dir <path> \
-#          --output timing_k16.csv --n-subjects 100 --K 16
-#   python scripts/walltime/measure_cpu_brats.py --brats <path> \
-#          --output timing_n100.csv --n-subjects 100
-# ---------------------------------------------------------------------------
-
-def _load_brats_ref_rows(
-    timing_n100_csv: Path,
-    timing_k16_csv: Path,
-) -> list[dict]:
-    """
-    Load BraTS reference timing rows from pre-computed CSV files.
-    Raises FileNotFoundError if either file is missing.
-    """
-    # --- timing_n100.csv: seq_cpu + gpu1 ---
-    if not timing_n100_csv.exists():
-        raise FileNotFoundError(
-            f"timing_n100.csv not found: {timing_n100_csv}\n"
-            "Generate it with scripts/walltime/measure_cpu_brats.py"
-        )
-    with open(timing_n100_csv, newline="") as f:
-        rows_n100 = list(csv.DictReader(f))
-
-    cpu_vals  = [float(r["t_cpu_s"])  for r in rows_n100 if r.get("t_cpu_s")  not in (None, "", "None")]
-    gpu1_vals = [float(r["t_gpu1_s"]) for r in rows_n100 if r.get("t_gpu1_s") not in (None, "", "None")]
-
-    if not cpu_vals:
-        raise ValueError(f"No valid t_cpu_s values in {timing_n100_csv}")
-    if not gpu1_vals:
-        raise ValueError(f"No valid t_gpu1_s values in {timing_n100_csv}")
-
-    seq_med  = round(statistics.median(cpu_vals),  3)
-    gpu1_med = round(statistics.median(gpu1_vals), 3)
-    source_n100 = f"timing_n100.csv (N={len(rows_n100)})"
-    print(f"  [A2] Loaded {timing_n100_csv.name}: seq_cpu={seq_med:.1f}s  gpu1={gpu1_med:.3f}s")
-
-    # --- timing_k16.csv: DD-FP K=16 ---
-    if not timing_k16_csv.exists():
-        raise FileNotFoundError(
-            f"timing_k16.csv not found: {timing_k16_csv}\n"
-            "Generate it with scripts/walltime/gen_timing_n100.py --K 16"
-        )
-    with open(timing_k16_csv, newline="") as f:
-        rows_k16 = list(csv.DictReader(f))
-
-    dd_vals = [float(r["t_dd_s"]) for r in rows_k16 if r.get("t_dd_s") not in (None, "", "None")]
-    if not dd_vals:
-        raise ValueError(f"No valid t_dd_s values in {timing_k16_csv}")
-
-    dd_med = round(statistics.median(dd_vals), 3)
-    source_k16 = f"timing_k16.csv (N={len(rows_k16)})"
-    print(f"  [A2] Loaded {timing_k16_csv.name}: ddfp_k16={dd_med:.3f}s")
-
-    source = source_n100 + " + " + source_k16
-
-    def _sp(t_method):
-        if t_method is None or seq_med == 0:
-            return None
-        return round(seq_med / t_method, 1)
-
-    return [
-        # Row 1: Sequential FP (seq_cpu)
-        {"ndim": 3, "size": 240, "n_voxels": 240*240*155,
-         "t_seq_cpu_s": seq_med, "t_par_cpu_s": None, "t_gpu_s": None,
-         "speedup_par_vs_seq": None, "speedup_gpu_vs_seq": None,
-         "note": f"BraTS seq_cpu median ({source})"},
-        # Row 2: GPU single-pass K=1
-        {"ndim": 3, "size": 240, "n_voxels": 240*240*155,
-         "t_seq_cpu_s": None, "t_par_cpu_s": None, "t_gpu_s": gpu1_med,
-         "speedup_par_vs_seq": None, "speedup_gpu_vs_seq": _sp(gpu1_med),
-         "note": f"BraTS GPU single-pass K=1 median ({source})"},
-        # Row 3: DD-FP K=16, δ=1 (paper main result)
-        {"ndim": 3, "size": 240, "n_voxels": 240*240*155,
-         "t_seq_cpu_s": None, "t_par_cpu_s": None, "t_gpu_s": dd_med,
-         "speedup_par_vs_seq": None, "speedup_gpu_vs_seq": _sp(dd_med),
-         "note": f"BraTS DD-FP K=16 δ=1 IBI median ({source})"},
-    ]
-
-
 SIZES_2D = [128, 256, 512]
 SIZES_3D = [32, 64, 128]
 N_REPEATS = 5
@@ -256,23 +166,12 @@ SEQ_CPU_SIZE_LIMIT_2D = 512     # >512^2: skip seq_cpu
 SEQ_CPU_SIZE_LIMIT_3D = 128     # >128^3: skip seq_cpu
 
 
-def run_a2(
-    out_dir: Path,
-    timing_n100_csv: Path | None = None,
-    timing_k16_csv: Path | None = None,
-) -> None:
+def run_a2(out_dir: Path) -> None:
     """
     Parameters
     ----------
-    out_dir          : directory for CSV and PNG outputs
-    timing_n100_csv  : path to timing_n100.csv (default: ROOT/timing_n100.csv)
-    timing_k16_csv   : path to timing_k16.csv  (default: ROOT/timing_k16.csv)
+    out_dir : directory for CSV and PNG outputs
     """
-    if timing_n100_csv is None:
-        timing_n100_csv = ROOT / "timing_n100.csv"
-    if timing_k16_csv is None:
-        timing_k16_csv = ROOT / "timing_k16.csv"
-
     out_dir.mkdir(parents=True, exist_ok=True)
     rows = []
 
@@ -336,7 +235,7 @@ def run_a2(
     print(f"\n{'='*70}")
     print("  Exp A2: Wall-Clock Speedup")
     print(f"  seq_cpu = Algorithm 1 FP (priority-queue)")
-    print(f"  par_cpu = Ispan construction only (vectorised numpy, FP omitted)")
+    print(f"  par_cpu = Ispan construction only (vectorized numpy, FP omitted)")
     print(f"  gpu     = DD-FP full pipeline (CuPy Level-BFS)")
     print(f"{'='*70}")
 
@@ -347,11 +246,6 @@ def run_a2(
     print("\n  --- 3D ---")
     for s in SIZES_3D:
         _measure(3, s, generate_synthetic_volume((s, s, s), seed=42))
-
-    # Append BraTS reference rows
-    brats_ref = _load_brats_ref_rows(timing_n100_csv, timing_k16_csv)
-    rows.extend(brats_ref)
-    print(f"\n  (+ BraTS ref appended from {timing_n100_csv.name} + {timing_k16_csv.name})")
 
     # CSV
     csv_path = out_dir / "a2_speedup.csv"
@@ -409,17 +303,9 @@ def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Exp A2: Wall-Clock Speedup")
     p.add_argument("--out-dir", type=Path, default=ROOT / "results" / "part_a",
                    help="Output directory (default: ROOT/results/part_a)")
-    p.add_argument("--timing-n100-csv", type=Path, default=None,
-                   help="Path to timing_n100.csv  [default: ROOT/timing_n100.csv]")
-    p.add_argument("--timing-k16-csv",  type=Path, default=None,
-                   help="Path to timing_k16.csv   [default: ROOT/timing_k16.csv]")
     return p.parse_args()
 
 
 if __name__ == "__main__":
     args = _parse_args()
-    run_a2(
-        out_dir=args.out_dir,
-        timing_n100_csv=args.timing_n100_csv,
-        timing_k16_csv=args.timing_k16_csv,
-    )
+    run_a2(out_dir=args.out_dir)

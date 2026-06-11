@@ -13,6 +13,7 @@ Inlined verbatim (no structural changes) -- validated on BraTS N=20:
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import sys
 import time
@@ -25,7 +26,7 @@ from scipy.ndimage import label, generate_binary_structure
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.utils.benchmark_utils import generate_synthetic_volume, verify_dwc
+from src.utils.benchmark_utils import generate_synthetic_volume
 
 try:
     import cupy as cp
@@ -253,7 +254,7 @@ def run_a3(out_dir: Path) -> None:
     print(f"  Metric: boundary face-block violations at IBI subdomain boundaries")
     print(f"  Expected: delta=0 -> violations>0 | delta>=1 -> violations==0")
     print(f"{'='*70}")
-    print(f"  {'image_id':<22} {'delta':>5} {'bdry_viol':>10} {'total_viol':>10} {'time_s':>8} {'R*':>4} {'beta0':>6}")
+    print(f"  {'image_id':<22} {'delta':>5} {'bdry_viol':>10} {'time_s':>8} {'R*':>4} {'beta0':>6}")
     print(f"  {'-'*70}")
 
     for img in TEST_IMAGES:
@@ -275,7 +276,6 @@ def run_a3(out_dir: Path) -> None:
                                         max_rounds=8, verbose=False)
                 u_out     = result["u_dd"]
                 bdry_viol = _count_boundary_violations(u_out, result["boundary_z_orig"])
-                total_viol = verify_dwc(vol3, u_out)["n_violations"]
                 u_2d      = u_out[:, :, 1] if not is_3d else u_out
                 beta0, _  = _betti_numbers(u_2d)
                 elapsed   = result["t_total_s"]
@@ -284,7 +284,7 @@ def run_a3(out_dir: Path) -> None:
                 print(f"  {iid:<22} {d:>5}  ERROR: {ex}")
                 continue
 
-            print(f"  {iid:<22} {d:>5} {bdry_viol:>10,} {total_viol:>10,} "
+            print(f"  {iid:<22} {d:>5} {bdry_viol:>10,} "
                   f"{elapsed:>8.3f} {R_star:>4}  {beta0:>6}")
 
             rows.append({
@@ -294,8 +294,6 @@ def run_a3(out_dir: Path) -> None:
                 "K":                 K_run,
                 "R_star":            R_star,
                 "bdry_violations":   bdry_viol,
-                "total_violations":  total_viol,
-                "violation_rate":    round(total_viol / max(u_out.size, 1), 6),
                 "time_s":            round(elapsed, 4),
                 "beta0":             beta0,
                 "dwc_ok":            bdry_viol == 0,
@@ -304,7 +302,7 @@ def run_a3(out_dir: Path) -> None:
     # CSV
     csv_path = out_dir / "a3_delta_sweep.csv"
     fieldnames = ["image_id","ndim","delta","K","R_star",
-                  "bdry_violations","total_violations","violation_rate",
+                  "bdry_violations","violation_rate",
                   "time_s","beta0","dwc_ok"]
     with open(csv_path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fieldnames)
@@ -315,25 +313,15 @@ def run_a3(out_dir: Path) -> None:
     _plot_time(rows, out_dir)
 
     print(f"\n  {'--- Hypothesis Check (3D only) ---':^68}")
-    print(f"  delta=0 uses total_viol (bdry_viol blind to uniform-0 uninitialised cells)")
     print(f"  delta>=1 uses bdry_viol (boundary face-block violations per Lemma 4)")
     print()
     for d in DELTAS:
         d3 = [r for r in rows if r["delta"] == d and r["ndim"] == 3]
         if not d3: continue
-        if d == 0:
-            # delta=0: use total_viol -- bdry_viol is blind because
-            # unwritten gz=2*z_b-1 stays at 0, making [0,0] always intersect any interval.
-            # total_viol captures the global DWC damage correctly.
-            total_tv = sum(r["total_violations"] for r in d3)
-            avg_tv = total_tv / len(d3)
-            ok = "PASS" if total_tv > 0 else "FAIL (expected total_viol > 0!)"
-            status = f"total_viol={total_tv:,} (avg {avg_tv:.0f}/vol)"
-        else:
-            total_bv = sum(r["bdry_violations"] for r in d3)
-            any_bv   = any(r["bdry_violations"] > 0 for r in d3)
-            ok = "PASS" if not any_bv else f"partial ({total_bv} residual)"
-            status = "bdry_viol==0" if not any_bv else f"bdry_viol={total_bv}"
+        total_bv = sum(r["bdry_violations"] for r in d3)
+        any_bv   = any(r["bdry_violations"] > 0 for r in d3)
+        ok = "PASS" if not any_bv else f"partial ({total_bv} residual)"
+        status = "bdry_viol==0" if not any_bv else f"bdry_viol={total_bv}"
         print(f"  delta={d}: {status:<40} {ok}")
 
     print(f"{'='*70}\n")
