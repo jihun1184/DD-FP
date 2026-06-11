@@ -202,7 +202,7 @@ python scripts/analysis/run_epsilon_sensitivity.py \
 #    Accepts JSON directly (no separate conversion step needed)
 python scripts/analysis/analyse_epsilon.py \
     --input epsilon_sensitivity.json \
-    --K 4 --delta 1 \
+    --K 16 --delta 1 \
     --out_dir results/analysis
 ```
 
