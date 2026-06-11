@@ -15,13 +15,13 @@ Segmentation target for topology-preserving tasks (DD-FP paper):
 
 Usage:
     # Manual download then convert
-    python scripts/prepare_cremi.py \\
+    python data/CREMI/prepare_cremi.py \\
         --hdf5-dir data/CREMI/raw/ \\
         --output-dir data/CREMI/ \\
         --max-slices 50
 
     # Auto-download + convert
-    python scripts/prepare_cremi.py --download --output-dir data/CREMI/
+    python data/CREMI/prepare_cremi.py --download --output-dir data/CREMI/
 
 Download URLs:
     https://cremi.org/static/data/sample_A_20160501.hdf
