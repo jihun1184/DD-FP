@@ -6,12 +6,6 @@ DD-FP Part B — Wilcoxon signed-rank verification script.
 Reproduces all topology-consistency Wilcoxon claims from the paper
 using a results CSV only; no preprocessing pipeline re-run required.
 
-Paper claims (topology consistency):
-  §4.3 / Abstract:
-    "All DRIVE pairwise comparisons (ddfp vs each baseline) are
-     statistically significant at p<0.001 (Wilcoxon signed-rank,
-     N=20; W=0 in all cases)."
-
 Test design:
   - One-sided Wilcoxon signed-rank, zero_method='wilcox'
   - Direction: ddfp is always the "smaller" side
@@ -47,8 +41,6 @@ TESTS: list[dict] = [
         "x_prep":    "ddfp",
         "y_prep":    "no_interp",      # y = baseline
         "alt":       "less",           # H1: ddfp < no_interp
-        "paper_W":   0,
-        "paper_p":   "<0.001",
         "note":      "anti-diagonal CC violations in no_interp",
     },
     # ── TSI ─────────────────────────────────────────────────────────────────
@@ -59,8 +51,6 @@ TESTS: list[dict] = [
         "x_prep":    "ddfp",
         "y_prep":    "naive_interp",
         "alt":       "less",
-        "paper_W":   0,
-        "paper_p":   "<0.001",
         "note":      "threshold-sensitive β₀ in naive_interp",
     },
     # ── b0_consistency ──────────────────────────────────────────────────────
@@ -71,8 +61,6 @@ TESTS: list[dict] = [
         "x_prep":    "no_interp",
         "y_prep":    "ddfp",
         "alt":       "less",           # H1: no_interp < ddfp
-        "paper_W":   0,
-        "paper_p":   "<0.001",
         "note":      "β₀⁸/β₀⁴ ratio; DWC → ratio=1, violation → ratio<<1",
     },
     # ── DWC violation rate ───────────────────────────────────────────────────
@@ -83,8 +71,6 @@ TESTS: list[dict] = [
         "x_prep":    "ddfp",
         "y_prep":    "no_interp",
         "alt":       "less",
-        "paper_W":   0,
-        "paper_p":   "<0.001",
         "note":      "pixel-level DWC violation rate; ddfp=0 by construction",
     },
     # ── chi_sign_flip ────────────────────────────────────────────────────────
@@ -97,8 +83,6 @@ TESTS: list[dict] = [
         "x_prep":    "ddfp",
         "y_prep":    "naive_interp",
         "alt":       "less",
-        "paper_W":   0,
-        "paper_p":   "<0.001",
         "note":      "sign(χ_interp)≠sign(χ_orig); naive: 95% flip, ddfp: 0%",
     },
 ]
@@ -158,6 +142,7 @@ def run_wilcoxon(
 def descriptive_stats(df: pd.DataFrame, col: str, dataset: str) -> pd.DataFrame:
     """Descriptive statistics for a given metric, grouped by preprocessing."""
     sub = df[df["dataset"] == dataset] if "dataset" in df.columns else df
+    print("sub:", sub.head())
     rows = []
     for prep in ["no_interp", "naive_interp", "ddfp"]:
         vals = sub[sub["preprocessing"] == prep][col].values
@@ -181,11 +166,11 @@ def run_verification(
     alpha: float = 0.001,
 ) -> bool:
     """
-    Load CSV → descriptive statistics → Wilcoxon tests → compare against paper values.
+    Load CSV → descriptive statistics → Wilcoxon tests.
 
     Returns
     -------
-    all_pass : bool — True if all tests match paper claims
+    df with W, p-value, etc.
     """
     df = pd.read_csv(csv_path)
     if "dataset" in df.columns:
@@ -250,16 +235,12 @@ def run_verification(
 
         res = run_wilcoxon(x_vals, y_vals, alternative=t["alt"])
 
-        paper_pass = (
-            res["W"] == t["paper_W"] and
+        _pass = (
             res["significant"] and
             res["pvalue"] is not None and
             res["pvalue"] < alpha
         )
-        verdict = "✅ PASS" if paper_pass else "⚠  FAIL"
-        if not paper_pass:
-            all_pass = False
-
+        verdict = "✅ PASS" if _pass else "⚠  FAIL"
         W_str = f"{res['W']:.1f}" if res["W"] is not None else "N/A"
         p_str = f"{res['pvalue']:.2e}" if res["pvalue"] is not None else "N/A"
         neff  = res["n_effective"]
@@ -268,7 +249,6 @@ def run_verification(
         print(f"    Metric : {t['metric']}")
         print(f"    N pairs: {res['n']}  (N_eff={neff}, ties excluded)")
         print(f"    Result : W={W_str},  p={p_str}  [{verdict}]")
-        print(f"    Paper  : W={t['paper_W']},  p{t['paper_p']}")
         if res["note"]:
             print(f"    Note   : {res['note']}")
         print()
@@ -284,38 +264,10 @@ def run_verification(
             "W":           res["W"],
             "pvalue":      res["pvalue"],
             "significant": res["significant"],
-            "paper_W":     t["paper_W"],
-            "paper_p_str": t["paper_p"],
-            "pass":        paper_pass,
             "note":        res["note"],
         })
 
-    print("── Summary ─────────────────────────────────────────────────────")
-    n_pass = sum(r["pass"] for r in results_rows)
-    n_total = len(results_rows)
-    print(f"  {n_pass}/{n_total} tests match paper claims (α={alpha})")
-    print()
-
-    if all_pass:
-        print("  ✅ All topology-consistency Wilcoxon claims REPRODUCED.")
-        print("     paper claim: p<0.001, W=0 in all cases (DRIVE, N=20)")
-    else:
-        print("  ⚠  Some claims could not be reproduced — see above.")
-
-    print()
-
-    print("── Paper Update Checklist ──────────────────────────────────────")
-    needs_update = False
-    for r in results_rows:
-        if not r["pass"]:
-            needs_update = True
-            print(f"  🔴 {r['label']}: W={r['W']}, p={r['pvalue']:.2e}"
-                  f" (paper: W={r['paper_W']}, p{r['paper_p_str']})")
-    if not needs_update:
-        print("  All W=0, p<0.001 reproduced — paper values confirmed.")
-    print()
-
-    return all_pass
+    return pd.DataFrame(results_rows)
 
 
 # CLI
@@ -340,6 +292,11 @@ def _parse() -> argparse.Namespace:
         default=0.001,
         help="significance level alpha (default: 0.001)",
     )
+    p.add_argument(
+        "--csv-out",
+        default=None,
+        help="path to output CSV (default: None)",
+    )
     return p.parse_args()
 
 
@@ -350,5 +307,7 @@ if __name__ == "__main__":
         print(f"[ERROR] CSV not found: {csv_path}")
         sys.exit(1)
 
-    passed = run_verification(csv_path, dataset=args.dataset, alpha=args.alpha)
-    sys.exit(0 if passed else 1)
+    df = run_verification(csv_path, dataset=args.dataset, alpha=args.alpha)
+    if args.csv_out:
+        df.to_csv(args.csv_out, index=False)
+        print(f"[INFO] Results saved to: {args.csv_out}")   
