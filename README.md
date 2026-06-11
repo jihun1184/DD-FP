@@ -185,14 +185,10 @@ Download the [DRIVE dataset](https://drive.grand-challenge.org/) and place the m
 
 ```bash
 # Download samples A/B/C and convert to 2-D PNG masks
-python scripts/preprocess/prepare_cremi.py \
-    --download \
-    --output-dir data/CREMI/
+python data/CREMI/prepare_cremi.py --download --output-dir data/CREMI/
 
 # Convert existing HDF5 files without downloading
-python scripts/preprocess/prepare_cremi.py \
-    --hdf5-dir data/CREMI/raw/ \
-    --output-dir data/CREMI/
+python data/CREMI/prepare_cremi.py --hdf5-dir data/CREMI/raw/ --output-dir data/CREMI/
 ```
 
 ### ε sensitivity experiments
