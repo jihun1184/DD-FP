@@ -13,7 +13,7 @@
 
 ```
 dd-fp/
-├── src/                              # Core library (importable as `src.*`)
+├── src/                      # Core library (importable as `src.*`)
 │   ├── ddfp/
 │   │   ├── __init__.py               # Public API: immersion_pipeline, run_ddfp_2d, get_backend
 │   │   ├── gpu_immersion.py          # Level-BFS CUDA kernel + IBI driver (CuPy)
@@ -28,9 +28,8 @@ dd-fp/
 │   │   ├── exp_a1_correctness.py     # E-NEW-1 · δ violation counts      (Table 2, Fig. 3)
 │   │   ├── exp_a2_speedup.py         # E-NEW-3 · wall-clock speedup       (Table 3, Fig. 5)
 │   │   ├── exp_a3_delta.py           # E-NEW-2 · K/δ ablation             (Fig. 4, Fig. 6)
-│   │   ├── exp_a4_scalability.py     # E-NEW-4 · linear scaling           (Fig. 7)
+│   │   └── exp_a4_scalability.py     # E-NEW-4 · linear scaling           (Fig. 7)
 │   │   
-│   │
 │   ├── part_b/                       # §5.2 — Topology-stable analysis (Paper Part B)
 │   │   ├── exp_b1_topology_accuracy.py  # DRIVE / CREMI-2D TSI/CC         (Table 4)
 │   │   ├── exp_b2_cc_analysis.py        # CC deep analysis, β₀/χ metrics
@@ -40,9 +39,6 @@ dd-fp/
 │   │
 │   ├── ddfp/
 │   │   └── experiment_DDFP_all.py    # DD-FP IBI v10 theory validation (sor_verify_full.json)
-│   │
-│   ├── preprocess/                   # One-time dataset preparation (not in scripts.zip)
-│   │   └── prepare_cremi.py          # CREMI HDF5 → 2-D PNG masks
 │   │
 │   └── analysis/                     # Supplementary analysis (TIPS, ε sensitivity)
 │       ├── tips.py                   # TIPS (eq:tips): N=20 paper values + N=1,251 full sweep
@@ -57,6 +53,7 @@ dd-fp/
 │   ├── BraTS2021/
 │   ├── DRIVE/
 │   └── CREMI/
+│       └── prepare_cremi.py          # CREMI HDF5 → 2-D PNG masks (이동 완료)
 │
 ├── results/                          # Output CSVs/JSON; auto-created by scripts
 │   ├── part_a/
