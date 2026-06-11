@@ -244,7 +244,7 @@ Backend selection (GPU vs CPU) is automatic and happens once at import time.
     - Implemented separate buffers
     - Fixed the swept direction
 
-- **`exp_a2_speedup.py` / **`exp_a4_scalability.py`**
+- **`exp_a2_speedup.py`** / **`exp_a4_scalability.py`**
   - Completely removed dependency on timing CSVs
      - Deleted the entire `_load_brats_ref_rows()` function.
      - Removed `timing_n100_csv` and `timing_k16_csv` parameters from `run_a2()`.
@@ -258,7 +258,7 @@ Backend selection (GPU vs CPU) is automatic and happens once at import time.
      - Removed `ref_vals` loading logic, drift check block, and conditional column printing from `_print_summary()`.
      - Simplified the `_row()` helper function.
 
-- **`exp_b3_brats_all.py` / **`exp_b4_cremi_3d.py`**
+- **`exp_b3_brats_all.py`** / **`exp_b4_cremi_3d.py`**
   - Implemented the `nearest-zoom` fix for `no_interp_3d`
 
 ---
