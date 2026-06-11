@@ -1,7 +1,7 @@
 """
 scripts/part_b/exp_b2_cc_analysis.py
 -------------------------------------
-Part B Experiment 2: Connectivity Consistency Deep Analysis
+Part B Experiment 2: Connectivity Consistency Analysis on 2D Drive/Cremi Dataset.
 
 Provides controlled validation of topology metric behaviour across:
   (a) Synthetic images — KNOWN topology, no GT ambiguity

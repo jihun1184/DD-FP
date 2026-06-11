@@ -1,7 +1,7 @@
 """
 scripts/part_b/exp_b1_topology_accuracy.py
 -------------------------------------------
-Part B Experiment 1: Topology Measurement Accuracy
+Part B Experiment 1: Topology Measurement Accuracy on 2D Drive/Cremi Dataset.
 
 Changes from original:
   [FIX-1] TSI threshold set: 5-point → 9-point (matching paper eq:tsi)
