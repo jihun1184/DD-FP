@@ -163,8 +163,7 @@ python scripts/part_b/exp_b4_cremi_3d.py \
     --output results/part_b/exp_b4_cremi_3d_results.csv
 
 # Reproduce Wilcoxon signed-rank (p < 0.001, W = 0)
-python scripts/part_b/verify_wilcoxon.py \
-    --csv results/part_b/exp_b1_results.csv
+python scripts/part_b/verify_wilcoxon.py \ --dataset drive --csv results/part_b/exp_b1_drive.csv 
 ```
 
 ---
