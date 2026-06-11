@@ -229,13 +229,46 @@ Backend selection (GPU vs CPU) is automatic and happens once at import time.
 
 ---
 
-## Reproducibility notes
+## Updates & Bug Fixes
 
-- All experiments that sample from BraTS use `seed=42` (passed via `--random-seed`).
-- The N=20 timing subsample in Table 3 is the first 20 subjects drawn by that seed from the 1,251-subject training set.
-- `verify_wilcoxon.py` reads a pre-existing results CSV and does not re-run the preprocessing pipeline, so it can be executed offline once Part B CSVs exist.
-- `exp_a2_speedup.py` and `exp_a4_scalability.py` generate all timing measurements from synthetic data and require no external files.
+- **`exp_a1_correctness.py`**
+  - Updated `no_interp_3d`: Changed from `max` to `nearest-zoom` ✅ **Complete**
+- **`gpu_immersion.py`**
+  - Direction A updates ✅ **Complete**
+    - Removed deferred hints
+    - Implemented separate buffers
+    - Fixed the swept direction
+- **`exp_b3` / **`exp_b4`**
+  - Implemented the `nearest-zoom` fix for `no_interp_3d`
 
+- **`exp_a1_correctness.py`**
+  - Fixed `NameError` bug (restored 2 smoke-tests)
+     - **Cause:** `csv_path` was used inside `run_a1()` without being defined.
+     - **Fix:** Added `csv_path = out_dir / "a1_correctness.csv"` right after `out_dir.mkdir()`.
+     - **Addition:** Added missing `import argparse`.
+
+- **`exp_a2_speedup.py`**
+  - Completely removed dependency on timing CSVs
+     - Deleted the entire `_load_brats_ref_rows()` function.
+     - Removed `timing_n100_csv` and `timing_k16_csv` parameters from `run_a2()`.
+     - Removed the BraTS reference row append block.
+     - Removed `--timing-n100-csv` and `--timing-k16-csv` CLI arguments.
+     - Removed `import statistics` and related comment blocks.
+
+- **`exp_a4_scalability.py`**
+  - Completely removed dependency on timing CSVs
+     - Deleted the entire `_load_brats_ref()` function.
+     - Removed `timing_n100_csv` parameter from `run_a4()`.
+     - Removed the BraTS reference row append block.
+     - Removed `--timing-n100-csv` CLI argument.
+     - Removed `import statistics` and deleted BraTS references from the docstring.
+
+- **`exp_b1_topology_accuracy.py`**
+  - Removed `--ref-csv` argument and associated logic
+     - Deleted `--ref-csv` argparse argument from `_parse()`.
+     - Removed `ref_vals` loading logic, drift check block, and conditional column printing from `_print_summary()`.
+     - Simplified the `_row()` helper function.
+     
 ---
 
 ## Environment used in the paper
