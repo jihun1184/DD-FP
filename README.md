@@ -333,8 +333,6 @@ python scripts/analysis/analyse_epsilon.py \
 | CPU | Intel Core i9-12900H (14 cores, up to 5.0 GHz) |
 | System RAM | 24 GB DDR5 |
 
-(Full environment details are provided in Supplement S8 of the paper.)
-
 ---
 
 ## License
