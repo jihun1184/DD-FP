@@ -182,7 +182,7 @@ You can replicate the boundary violation removal mechanism (Lemma 3+4) and the I
 
 * **Verify IBI Results Only (E-NEW-2 / Practical Range Test):**
     ```bash
-    python scripts/ddfp/experiment_DDFP_all.py --synth_only --skip e1b e3 --K 16 --deltas_e2 1 2  --n_trials 5
+    python scripts/ddfp/experiment_DDFP_all.py --synth_only --skip e1b e3 --K 16 --deltas_e2 1 2 --n_trials 5
     ```
 
 * **Full Dataset Validation (BraTS 3-D Full Sweep):**
