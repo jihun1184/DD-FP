@@ -127,7 +127,54 @@ pytest test/test_smoke.py -v --run-gpu     # include GPU tests (requires CuPy)
 
 Expected: **77 passed**
 
-### Part A — DWC correctness & efficiency (no dataset required)
+---
+
+## Core API
+
+```python
+from src.ddfp import immersion_pipeline, run_ddfp_2d, get_backend
+
+print(get_backend())   # "gpu" or "cpu"
+
+# 3-D pipeline: uint8 (W, H, D) → float32 (2W-1, 2H-1, 2D-1)
+import numpy as np
+vol = np.random.randint(0, 256, (64, 64, 64), dtype=np.uint8)
+u_dwc = immersion_pipeline(vol)
+
+# 2-D wrapper: float32 (H, W) in [0,1] → float32 (2H-1, 2W-1)
+img = np.random.rand(256, 256).astype(np.float32)
+u_dwc_2d = run_ddfp_2d(img)
+```
+
+Backend selection (GPU vs CPU) is automatic and happens once at import time.
+
+---
+
+## Data preparation
+
+### BraTS 2021
+
+Download the BraTS2021 Dataset (official site [here](https://www.med.upenn.edu/cbica/brats2021/), [kaggle version](https://www.kaggle.com/datasets/dschettler8845/brats-2021-task1) also available) and extract to `data/BraTS2021/` so that subject directories follow the pattern `BraTS2021_XXXXX/`.
+
+### DRIVE
+
+Download the [DRIVE dataset](https://drive.grand-challenge.org/) and place the manual segmentation masks under `data/DRIVE/training/1st_manual/` (`.gif` or `.png` accepted).
+
+### CREMI
+
+`prepare_cremi.py` can download and convert the CREMI samples automatically:
+
+```bash
+# Download samples A/B/C and convert to 2-D PNG masks
+python data/CREMI/prepare_cremi.py --download --output-dir data/CREMI/
+
+# Convert existing HDF5 files without downloading
+python data/CREMI/prepare_cremi.py --hdf5-dir data/CREMI/raw/ --output-dir data/CREMI/
+```
+
+---
+
+## Part A — DWC correctness & efficiency (no dataset required)
 
 All Part A experiments generate synthetic volumes internally and require no external data files.
 
@@ -140,7 +187,7 @@ python scripts/part_a/exp_a4_scalability.py     # ~5 min  (GPU)
 
 Results are written to `results/part_a/`.
 
-### Part B — Topology-stable analysis (datasets required)
+## Part B — Topology-stable analysis (datasets required)
 
 ```bash
 # 2D datasets
@@ -198,31 +245,7 @@ When running experiments on synthetic volumes (`synth_gaussian` or `synth_ramp_z
 * **Solution & Paper Reporting:** To address this, we introduced the `--n_trials N` argument. The statistics reported in Table 2 (`tab:enew1`) of the paper reflect the `mean ± std` computed over 5 independent runs.
 * *Note: This variation **does not occur** when running real **BraTS datasets**, because the underlying MRI data consists of discrete `uint8` integers where intensity values are safely distributed far from the threshold boundaries.*
 
----
-
-## Data preparation
-
-### BraTS 2021
-
-Download the BraTS2021 Dataset (official site [here](https://www.med.upenn.edu/cbica/brats2021/), [kaggle version](https://www.kaggle.com/datasets/dschettler8845/brats-2021-task1) also available) and extract to `data/BraTS2021/` so that subject directories follow the pattern `BraTS2021_XXXXX/`.
-
-### DRIVE
-
-Download the [DRIVE dataset](https://drive.grand-challenge.org/) and place the manual segmentation masks under `data/DRIVE/training/1st_manual/` (`.gif` or `.png` accepted).
-
-### CREMI
-
-`prepare_cremi.py` can download and convert the CREMI samples automatically:
-
-```bash
-# Download samples A/B/C and convert to 2-D PNG masks
-python data/CREMI/prepare_cremi.py --download --output-dir data/CREMI/
-
-# Convert existing HDF5 files without downloading
-python data/CREMI/prepare_cremi.py --hdf5-dir data/CREMI/raw/ --output-dir data/CREMI/
-```
-
-### ε sensitivity experiments
+## ε sensitivity experiments
 
 ```bash
 # 1. Run sensitivity sweep (ε ∈ {0.1, 0.5, 1.0, 2.0})
@@ -237,27 +260,6 @@ python scripts/analysis/analyse_epsilon.py \
     --K 16 --delta 1 \
     --out_dir results/analysis
 ```
-
----
-
-## Core API
-
-```python
-from src.ddfp import immersion_pipeline, run_ddfp_2d, get_backend
-
-print(get_backend())   # "gpu" or "cpu"
-
-# 3-D pipeline: uint8 (W, H, D) → float32 (2W-1, 2H-1, 2D-1)
-import numpy as np
-vol = np.random.randint(0, 256, (64, 64, 64), dtype=np.uint8)
-u_dwc = immersion_pipeline(vol)
-
-# 2-D wrapper: float32 (H, W) in [0,1] → float32 (2H-1, 2W-1)
-img = np.random.rand(256, 256).astype(np.float32)
-u_dwc_2d = run_ddfp_2d(img)
-```
-
-Backend selection (GPU vs CPU) is automatic and happens once at import time.
 
 ---
 
