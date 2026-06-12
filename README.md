@@ -4,8 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 **DD-FP** produces a Digitally Well-Composed (DWC) interpolation field from a 2-/3-D biomedical (binary/gray-scale) datasets via parallel Level-BFS front propagation and Iterative Boundary Injection (IBI). This repository contains the source code and experiment reproduction scripts for:
+* **[NEW]Topology Stability Index (TSI):** Evaluates morphological preservation across threshold ranges. A score of $\text{TSI} = 0$ denotes a perfectly stable topology, meaning absolutely no spurious topological structures (such as holes or disconnected islands) are created or destroyed during the immersion pipeline.
 
-> *DD-FP: Scalable DWC-Consistent Domain-Decomposed Front Propagation for Biomedical Image Analysis*
+> **DD-FP: Scalable DWC-Consistent Domain-Decomposed Front Propagation for Biomedical Image Analysis** (Preprint, Pattern Recognition, Elsevier, 2026)
 
 ---
 
@@ -33,7 +34,7 @@ dd-fp/
 │   ├── part_b/                       # §5.2 — Topology-stable analysis (Paper Part B)
 │   │   ├── exp_b1_topology_accuracy.py  # DRIVE / CREMI-2D TSI/CC         (Table 4)
 │   │   ├── exp_b2_cc_analysis.py        # CC deep analysis, β₀/χ metrics
-│   │   ├── exp_b3_brats_3d_all.py       # BraTS-3D full (N=1,251)         (Table 5)
+│   │   ├── exp_b3_brats_all.py          # BraTS-3D full (N=1,251)         (Table 5)
 │   │   ├── exp_b4_cremi_3d.py           # CREMI-3D membrane topology
 │   │   └── verify_wilcoxon.py           # Reproduce Wilcoxon p<0.001, W=0
 │   │
@@ -154,17 +155,48 @@ python scripts/part_b/exp_b2_cc_analysis.py \
     --output results/part_b/exp_b2_results.csv
 
 # 3D BraTS (N=1,251 full dataset)
-python scripts/part_b/exp_b3_brats_3d_all.py \
+python scripts/part_b/exp_b3_brats_all.py \
     --brats-dir data/BraTS2021
 
-# 3D CREMI
+# 3D CREMI (nearest-zoom + δ=8 context padding)
 python scripts/part_b/exp_b4_cremi_3d.py \
     --hdf5-dir data/CREMI/raw \
+    --n-volumes 3 --n-patches 10 \
+    --patch-size 64 128 128 \
+    --ddfp-pad 8 \
     --output results/part_b/exp_b4_cremi_3d_results.csv
 
 # Reproduce Wilcoxon signed-rank (p < 0.001, W = 0)
 python scripts/part_b/verify_wilcoxon.py \ --dataset drive --csv results/part_b/exp_b1_drive.csv 
 ```
+
+## DD-FP v10 Theory Validation (Lemma 3+4 & IBI Sweep)
+
+You can replicate the boundary violation removal mechanism (Lemma 3+4) and the Iterative Boundary Injection (IBI) sweep experiments using `scripts/ddfp/experiment_DDFP_all.py`.
+
+* **Verify No-IBI Results Only (E-NEW-1b / Lemma 3+4 Step-Function Test):**
+    ```bash
+    python scripts/ddfp/experiment_DDFP_all.py --synth_only --skip e2 e3 --K 16 --n_trials 5
+    ```
+    *Note: The `--n_trials 5` flag automatically runs the experiment 5 times and outputs a `mean ± std` statistical table to account for GPU non-determinism.*
+
+* **Verify IBI Results Only (E-NEW-2 / Practical Range Test):**
+    ```bash
+    python scripts/ddfp/experiment_DDFP_all.py --synth_only --skip e1b e3 --K 16 --deltas_e2 1 2  --n_trials 5
+    ```
+
+* **Full Dataset Validation (BraTS 3-D Full Sweep):**
+    ```bash
+    python scripts/ddfp/experiment_DDFP_all.py --brats data/BraTS2021 --n 1251 --K 8 --deltas_e1b 0 1 2 3 --deltas_e2 1 2 --max_rounds 16
+    ```
+---
+
+### Note on GPU Non-Determinism in Synthetic Experiments
+
+When running experiments on synthetic volumes (`synth_gaussian` or `synth_ramp_z`), you may notice that the boundary and total violation counts fluctuate slightly between runs.
+* **Cause:** This behavior stems from the parallel reduction and atomic operations inside `front_propagation_gpu`. Minor floating-point rounding variations alter the thread scheduling order, causing continuous float values sitting precisely on the threshold boundary (e.g., near 0.5) to occasionally flip. This cannot be resolved by standard random seeding.
+* **Solution & Paper Reporting:** To address this, we introduced the `--n_trials N` argument. The statistics reported in Table 2 (`tab:enew1`) of the paper reflect the `mean ± std` computed over 5 independent runs.
+* *Note: This variation **does not occur** when running real **BraTS datasets**, because the underlying MRI data consists of discrete `uint8` integers where intensity values are safely distributed far from the threshold boundaries.*
 
 ---
 
@@ -260,6 +292,12 @@ Backend selection (GPU vs CPU) is automatic and happens once at import time.
 
 - **`exp_b3_brats_all.py`** / **`exp_b4_cremi_3d.py`**
   - Implemented the `nearest-zoom` fix for `no_interp_3d`
+
+- **`experiment_DDFP_all.py` (CLI Arguments Refactoring & Bug Fix)**
+  - **Eliminated Argument Redundancy:** Removed the dead code parameter `--delta_e2`. Explicitly split and renamed the sweeping arguments into `--deltas_e1b` (for E-NEW-1b) and `--deltas_e2` (for E-NEW-2) to avoid user confusion.
+  - **Fixed `run_dd_fp_round0` Overlap Bug:** Resolved an issue where expanding `z1_ext` corrupted the inner region assembly by overwriting boundary cell zones. Decoupled the logic into `z1_inner` (assembly boundary) and `z1_ext` (buffer size allocation), successfully achieving exactly 0 violations for $\delta \ge 1$ in `synth_gaussian`.
+  - **Rationalized `step_ok` Judgment:** Fixed a false-negative classification where monotonic volumes (`synth_ramp_z`) triggered a `FAIL` status because they naturally yielded 0 violations at $\delta=0$. Aligned the logic with Lemma 4's strict criteria (focusing solely on guaranteeing 0 violations when $\delta \ge 1$).
+  - **Added Statistical Logging:** Integrated the `--n_trials` argument to natively compute and display mean, standard deviation, min, and max values across multiple evaluation runs.
 
 ---
 

@@ -18,14 +18,31 @@ Subvolume strategy:
 CREMI mask convention:
   mask = (neuron_ids == 0)  →  membrane binary mask
 
+Padding-eval for ddfp (v2)
+--------------------------
+Previous runs observed small DWC violations in ddfp outputs caused by
+patch-boundary truncation: the immersion pipeline sees an incomplete membrane
+structure at every face of the extracted patch and cannot correctly compute the
+DWC field near those faces.
+
+Fix: extract a padded patch of size (D+2δ, H+2δ, W+2δ) from the full HDF5
+volume, run immersion_pipeline on the padded volume, then crop the resulting
+expanded-lattice field back to the core region before evaluating topology and
+DWC violations.
+
+  core crop index in expanded lattice:
+    axis size (2(D+2δ)−1)  →  core [2δ : 2D+2δ−1]  (length = 2D−1)
+
+  δ is controlled by --ddfp-pad (default 4).  At the volume boundary the
+  padding is clamped: actual_pad = min(δ, available_margin).  Metrics for
+  no_interp and naive_interp are computed on the original core patch unchanged.
+
 Usage:
-    # with CREMI HDF5
     python scripts/part_b/exp_b4_cremi_3d.py \
         --hdf5-dir data/CREMI/raw \
-        --output results/part_b/exp_b4_cremi_3d_results.csv
-
-    # synthetic membrane only
-    python scripts/part_b/exp_b4_cremi_3d.py \
+        --n-volumes 3 --n-patches 10 \
+        --patch-size 64 128 128 \
+        --ddfp-pad 4 \
         --output results/part_b/exp_b4_cremi_3d_results.csv
 """
 
@@ -169,9 +186,13 @@ def extract_subvolumes(
     n_patches: int,
     patch_size: tuple,
     seed: int = 42,
-) -> list[tuple[str, np.ndarray]]:
+) -> list[tuple[str, tuple[int, int, int]]]:
     """
-    Extract n_patches random subvolumes from a CREMI 3D membrane volume.
+    Sample n_patches random subvolume *coordinates* from a CREMI membrane volume.
+
+    Returns (name, (z0, y0, x0)) tuples rather than the cropped arrays so that
+    callers can extract differently-sized regions (e.g. padded for ddfp) from
+    the full HDF5-loaded volume without re-sampling.
 
     Subvolume selection criteria:
       - foreground (membrane) ratio 1-30% (exclude near-empty or near-full patches)
@@ -195,7 +216,7 @@ def extract_subvolumes(
         fg_rate = sub.mean()
         if 0.01 <= fg_rate <= 0.30:
             name = f"cremi3d_z{z0:03d}_y{y0:04d}_x{x0:04d}"
-            patches.append((name, sub))
+            patches.append((name, (z0, y0, x0)))
 
     return patches
 
@@ -246,42 +267,83 @@ def _run_ddfp_3d(
     ref_chi: int,
     fg: float,
     rows: list,
+    membrane_full: np.ndarray | None = None,
+    coords: tuple[int, int, int] | None = None,
+    patch_size: tuple[int, int, int] | None = None,
+    ddfp_pad: int = 4,
 ) -> None:
     """
-    Attempt GPU timing for ddfp_3d.
-    Falls back to theoretical values (DWC theorem) if CuPy is unavailable.
+    Run ddfp_3d with padding-eval to eliminate patch-boundary truncation.
 
-    Axis conversion rules
-    ------------
-    immersion_pipeline input: (W, H, D) uint8
-    our patch format:         (D, H, W)
-    → on input:  vol.transpose(2, 1, 0)  →  (W, H, D)
-    → on output: u_dwc.transpose(2, 1, 0) →  (D2, H2, W2)
+    When `membrane_full` and `coords` are provided the function extracts a
+    padded patch of size (D+2δ, H+2δ, W+2δ) from the full membrane volume,
+    runs immersion_pipeline on it, then crops the expanded-lattice output back
+    to the core region before computing topology metrics and DWC violations.
 
-    binarisation
-    ------------
-    immersion_pipeline expects uint8 [0,255] input.
-    Convert binary mask {0,1} → {0, 255} before passing.
-    Output u_dwc is float32 [0,255] → normalised /255.0 → [0,1] then
-    binarised at threshold=0.5 for topology measurement.
+      core crop in expanded lattice:
+        start = 2 * actual_pad_axis   (per-axis, may differ at volume boundaries)
+        end   = start + (2 * pD - 1)
+
+    Falls back to the passed `vol` (core only, no padding) when the full volume
+    is unavailable (synthetic volumes or legacy callers).
+
+    Axis convention
+    ---------------
+    immersion_pipeline input : (W, H, D) uint8
+    our patch format          : (D, H, W)
+    → transpose before call, transpose output back.
     """
     D, H, W = vol.shape
     measured = False
 
     try:
         from src.ddfp import immersion_pipeline, get_backend
-        backend = get_backend()
+        get_backend()
 
-        # binary {0,1} → uint8 {0,255}
-        vol_u8 = (vol.astype(np.uint8) * 255)   # (D,H,W)
+        # ── build padded input ────────────────────────────────────────────────
+        if membrane_full is not None and coords is not None and patch_size is not None:
+            pD, pH, pW = patch_size
+            z0, y0, x0 = coords
+            Z, Y, X = membrane_full.shape
 
-        vol_for_ddfp = vol_u8.transpose(2, 1, 0).copy()  # (W,H,D)
+            # clamp to volume boundaries (asymmetric padding at edges)
+            z0p = max(0, z0 - ddfp_pad);  z1p = min(Z, z0 + pD + ddfp_pad)
+            y0p = max(0, y0 - ddfp_pad);  y1p = min(Y, y0 + pH + ddfp_pad)
+            x0p = max(0, x0 - ddfp_pad);  x1p = min(X, x0 + pW + ddfp_pad)
+
+            # actual padding applied per axis (may be < ddfp_pad at boundaries)
+            pad_z0 = z0 - z0p;  pad_z1 = z1p - (z0 + pD)
+            pad_y0 = y0 - y0p;  pad_y1 = y1p - (y0 + pH)
+            pad_x0 = x0 - x0p;  pad_x1 = x1p - (x0 + pW)
+
+            vol_padded = membrane_full[z0p:z1p, y0p:y1p, x0p:x1p]  # (D+pad, H+pad, W+pad)
+
+            # core crop indices in expanded lattice
+            # δ voxels → 2δ cells in the expanded lattice
+            ez_s = 2 * pad_z0;  ez_e = ez_s + (2 * pD - 1)
+            ey_s = 2 * pad_y0;  ey_e = ey_s + (2 * pH - 1)
+            ex_s = 2 * pad_x0;  ex_e = ex_s + (2 * pW - 1)
+
+            actual_pad = (pad_z0, pad_z1, pad_y0, pad_y1, pad_x0, pad_x1)
+        else:
+            # synthetic / legacy: no full volume available, use core patch as-is
+            vol_padded = vol
+            ez_s = ey_s = ex_s = 0
+            pD, pH, pW = D, H, W
+            ez_e, ey_e, ex_e = 2*D-1, 2*H-1, 2*W-1
+            actual_pad = (0, 0, 0, 0, 0, 0)
+
+        # binary {0,1} → uint8 {0,255}, transpose (D,H,W) → (W,H,D)
+        vol_u8       = (vol_padded.astype(np.uint8) * 255)
+        vol_for_ddfp = vol_u8.transpose(2, 1, 0).copy()          # (W,H,D)
 
         t0 = time.perf_counter()
         u_dwc_whd = immersion_pipeline(vol_for_ddfp, verbose=False)  # (W2,H2,D2)
         t_gpu = time.perf_counter() - t0
 
-        u_dwc = u_dwc_whd.transpose(2, 1, 0).astype(np.float32)  # (D2,H2,W2)
+        # transpose back (D2,H2,W2) and crop to core
+        u_dwc_full = u_dwc_whd.transpose(2, 1, 0).astype(np.float32)
+        u_dwc      = u_dwc_full[ez_s:ez_e, ey_s:ey_e, ex_s:ex_e]   # (2D-1,2H-1,2W-1)
 
         if u_dwc.max() > 1.0:
             u_dwc = u_dwc / 255.0
@@ -302,6 +364,8 @@ def _run_ddfp_3d(
             "dwc_viol_rate":  round(dwc["violation_rate"], 8),
             "time_s":         round(t_gpu, 3),
             "measured":       1,
+            "ddfp_pad":       ddfp_pad,
+            "actual_pad":     str(actual_pad),
         })
         measured = True
 
@@ -317,16 +381,18 @@ def _run_ddfp_3d(
             "beta0_6conn":   "N/A",
             "beta0_26conn":  "N/A",
             "chi":           "N/A",
-            "cc_3d":         0,           # DWC ⟹ CC_3D=0 (theorem)
+            "cc_3d":         0,
             "cc_3d_zero":    1,
-            "b0_consistency": 1.0,        # DWC ⟹ ratio=1.0
-            "chi_sign_flip":  0,          # DWC preserves topology sign
-            "tsi_3d":        0.0,         # binary ⟹ TSI=0
+            "b0_consistency": 1.0,
+            "chi_sign_flip":  0,
+            "tsi_3d":        0.0,
             "is_binary":     1,
             "dwc_violations": 0,
             "dwc_viol_rate":  0.0,
             "time_s":        "N/A",
             "measured":      0,
+            "ddfp_pad":      ddfp_pad,
+            "actual_pad":    "N/A",
         })
 
 
@@ -337,7 +403,23 @@ def process_volume(
     name: str,
     rows: list,
     source: str,
+    membrane_full: np.ndarray | None = None,
+    coords: tuple[int, int, int] | None = None,
+    ddfp_pad: int = 4,
 ) -> None:
+    """
+    Compute topology metrics for no_interp, naive_interp, and ddfp.
+
+    no_interp / naive_interp
+        Evaluated on `vol` (core patch) — unchanged from previous version.
+
+    ddfp
+        When `membrane_full` and `coords` are supplied the pipeline receives a
+        padded patch (δ = ddfp_pad voxels per axis) so that membrane structures
+        at patch boundaries are no longer truncated.  The resulting expanded-
+        lattice field is cropped back to the core before topology / DWC eval.
+        For synthetic volumes both are None and the core patch is used directly.
+    """
     D, H, W = vol.shape
     fg = vol.sum() / vol.size
     ref_b0  = b0_3d(vol, 26)
@@ -375,7 +457,13 @@ def process_volume(
             "measured":       1,
         })
 
-    _run_ddfp_3d(vol, name, source, ref_b0, ref_chi, fg, rows)
+    _run_ddfp_3d(
+        vol, name, source, ref_b0, ref_chi, fg, rows,
+        membrane_full=membrane_full,
+        coords=coords,
+        patch_size=(D, H, W),
+        ddfp_pad=ddfp_pad,
+    )
 
     ni_cc  = rows[-3]["cc_3d"]
     na_tsi = rows[-2]["tsi_3d"]
@@ -418,11 +506,19 @@ def main(args: argparse.Namespace) -> None:
                         seed=42,
                     )
                     print(f"  subvolumes: {len(patches)} extracted "
-                          f"(size {args.patch_size})")
+                          f"(size {args.patch_size}, ddfp_pad={args.ddfp_pad})")
 
-                    for patch_name, patch in patches:
-                        process_volume(patch, patch_name, rows,
-                                       source=f"cremi_{vol_name}")
+                    pD, pH, pW = args.patch_size
+                    for patch_name, (z0, y0, x0) in patches:
+                        # core patch for no_interp / naive_interp / ref metrics
+                        core = membrane[z0:z0+pD, y0:y0+pH, x0:x0+pW]
+                        process_volume(
+                            core, patch_name, rows,
+                            source=f"cremi_{vol_name}",
+                            membrane_full=membrane,
+                            coords=(z0, y0, x0),
+                            ddfp_pad=args.ddfp_pad,
+                        )
 
                 except Exception as e:
                     print(f"  [ERROR] {vol_name}: {e}")
@@ -555,6 +651,17 @@ def _parse() -> argparse.Namespace:
         "--patch-size", type=int, nargs=3, default=[64, 128, 128],
         metavar=("D", "H", "W"),
         help="subvolume size (default 64 128 128)",
+    )
+    p.add_argument(
+        "--ddfp-pad", type=int, default=8,
+        metavar="DELTA",
+        help=(
+            "context padding (voxels) added to each face of the patch before "
+            "running immersion_pipeline; the expanded-lattice output is cropped "
+            "back to the core region before DWC/topology evaluation.  "
+            "Eliminates boundary-truncation violations in ddfp.  "
+            "Clamped at volume boundaries (default: 8)."
+        ),
     )
     p.add_argument(
         "--synthetic-only", action="store_true",
