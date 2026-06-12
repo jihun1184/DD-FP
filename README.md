@@ -122,8 +122,8 @@ pip install cupy-cuda12x   # example for CUDA 12.x
 All scripts are run **from the repository root**. `ROOT` is resolved automatically as `Path(__file__).resolve().parent.parent.parent`.
 
 ```bash
-git clone https://github.com/<your-org>/dd-fp.git
-cd dd-fp
+git clone https://github.com/<your-org>/DD-FP.git
+cd DD-FP
 pip install -r requirements.txt
 ```
 
