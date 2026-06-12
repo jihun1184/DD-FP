@@ -17,7 +17,7 @@
 * **Topology Stability Index (TSI):** Evaluates morphological preservation across threshold ranges. A score of $\text{TSI} = 0$ denotes a perfectly stable topology, meaning absolutely no spurious topological structures (such as holes or disconnected islands) are created or destroyed during the immersion pipeline.
 
 This repository contains the source code and experiment reproduction scripts for:
-> **DD-FP: Scalable DWC-Consistent Domain-Decomposed Front Propagation for Biomedical Image Analysis** (Preprint, Pattern Recognition, Elsevier, 2026)
+> **DD-FP: Scalable Digitally Well-Composed Interpolation with Provable Guarantees for Topology-Stable Biomedical Image Analysis** (Preprint, Pattern Recognition, Elsevier, 2026)
 
 ---
 
