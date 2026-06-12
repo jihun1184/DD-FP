@@ -8,7 +8,7 @@
    * We prove that a halo width of $\delta=1$ is the **uniquely optimal choice** (Corollary 3.14)
      * $\delta=0$ directly violates DWC correctness due to propagation path severance.
      * $\delta\ge2$ breaks the inflationary guarantee of the assembled operator, making the convergence bound ($R^*$) image- and partition-dependent rather than structurally assured.
-   * At $\delta=1$, the proposed **Iterative Boundary Injection (IBI)** structurally guarantees convergence to the global DWC optimum in **$R^* \le 2$ rounds** for any subdomain count $K$ satisfying the boundary-seed coverage condition (A1).
+   * At $\delta=1$, the proposed **Iterative Boundary Injection (IBI)** structurally guarantees convergence to the global DWC optimum in **$R^ \le 2$ rounds** for any subdomain count $K$ satisfying the boundary-seed coverage condition (A1).
    * We show this bound is tight ($R^*=2$) at $K=16$ across all 1,251 BraTS 2021 subjects.
 * **Scalable GPU Implementation with Boundary-Seed Correction**
    * We replace the sequential, data-dependent front-propagation sweep with a parallelized **Level-BFS** strategy.
