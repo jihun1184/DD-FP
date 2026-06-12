@@ -39,7 +39,7 @@ dd-fp/
 │   │   └── verify_wilcoxon.py           # Reproduce Wilcoxon p<0.001, W=0
 │   │
 │   ├── ddfp/
-│   │   └── experiment_DDFP_all.py    # DD-FP IBI v10 theory validation (sor_verify_full.json)
+│   │   └── experiment_DDFP_all.py    # DD-FP IBI validation (sor_verify_full.json)
 │   │
 │   └── analysis/                     # Supplementary analysis (TIPS, ε sensitivity)
 │       ├── tips.py                   # TIPS (eq:tips): N=20 paper values + N=1,251 full sweep
@@ -170,7 +170,7 @@ python scripts/part_b/exp_b4_cremi_3d.py \
 python scripts/part_b/verify_wilcoxon.py \ --dataset drive --csv results/part_b/exp_b1_drive.csv 
 ```
 
-## DD-FP v10 Theory Validation (Lemma 3+4 & IBI Sweep)
+## DD-FP Validation (Lemma 3+4 & IBI Sweep)
 
 You can replicate the boundary violation removal mechanism (Lemma 3+4) and the Iterative Boundary Injection (IBI) sweep experiments using `scripts/ddfp/experiment_DDFP_all.py`.
 
