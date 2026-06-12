@@ -54,7 +54,7 @@ dd-fp/
 │   ├── BraTS2021/
 │   ├── DRIVE/
 │   └── CREMI/
-│       └── prepare_cremi.py          # CREMI HDF5 → 2-D PNG masks (이동 완료)
+│       └── prepare_cremi.py          # CREMI HDF5 → 2-D PNG masks
 │
 ├── results/                          # Output CSVs/JSON; auto-created by scripts
 │   ├── part_a/
