@@ -254,7 +254,7 @@ You can replicate the boundary violation removal mechanism (Lemma 3+4) and the I
     ```bash
     python scripts/ddfp/experiment_DDFP_all.py --synth_only --skip e1b e2 --K 4
     ```
-    The CPU sequential FP baseline (`build_ispan_cpu`, `fp_cpu`) is now isolated in `src/ddfp/cpu_fp.py` and imported by the experiment script. Pass: `max_diff_boundary < 0.5` **and** `bdry_viol == 0`.
+  
 ---
 
 ### Note on GPU Non-Determinism in Synthetic Experiments
