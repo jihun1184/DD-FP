@@ -49,6 +49,7 @@ from src.ddfp.gpu_immersion import (
     build_ispan_gpu,
     front_propagation_gpu
 )
+from src.ddfp.cpu_fp import build_ispan_cpu, fp_cpu
  
 warnings.filterwarnings("ignore")
  
@@ -378,13 +379,27 @@ def _wilson_ci(k, n, z=1.96):
     return max(0.0, centre - margin) * 100, min(1.0, centre + margin) * 100
  
  
-def _compute_kappa(vol_u8, boundary_z) -> float:
-    """Gray-level range in ±1-voxel band around each subdomain boundary."""
-    v = vol_u8.astype(np.float32)
-    kappas = [float(v[:, :, max(0,z-1):min(v.shape[2],z+2)].max()
-                    - v[:, :, max(0,z-1):min(v.shape[2],z+2)].min())
-              for z in boundary_z]
-    return float(np.median(kappas)) if kappas else 0.0
+def _compute_kappa(vol_u8, boundary_z, K) -> tuple[float, float]:
+    from src.ddfp.gpu_immersion import build_ispan_gpu
+    v = vol_u8
+    D = v.shape[2]
+    slices_z = split_domain_1d(D, K)
+    kappa_per_boundary = []
+    for k, (z0, z1) in enumerate(slices_z[:-1]):
+        z_b = z1  # 경계 위치
+        # 해당 경계 주변의 subdomain 슬라이스로 ispan 구성
+        sub = v[:, :, max(0, z_b-1):min(D, z_b+2)]
+        U_lo, U_hi, _ = build_ispan_gpu(sub)
+        # expanded lattice에서 z_b에 해당하는 1-cell 레이어 추출
+        # 경계 1-cell: expanded lattice z-index = 2*local_z_b (홀수 위치)
+        local_zb = z_b - max(0, z_b-1)
+        ez = 2 * local_zb  # expanded lattice z-index
+        if 0 < ez < U_lo.shape[2]:
+            interval_width = (U_hi[:,:,ez] - U_lo[:,:,ez]).max().item()
+            kappa_per_boundary.append(float(interval_width))
+    if not kappa_per_boundary:
+        return 0.0, 0.0
+    return float(np.median(kappa_per_boundary)), float(np.max(kappa_per_boundary))
  
  
 def run_enew2(vol_u8, name, K_list=None, delta=1, max_rounds=8) -> dict:
@@ -418,79 +433,11 @@ def run_enew2(vol_u8, name, K_list=None, delta=1, max_rounds=8) -> dict:
             "rows": rows, "all_K_ok": all_ok}
  
  
-# ── CPU sequential FP (E-NEW-3 baseline) ─────────────────────────────────────
- 
-def _snap(lv, lo, hi):
-    return min(max(lv, lo), hi)
- 
- 
-def build_ispan_cpu(vol_u8):
-    W, H, D = vol_u8.shape; s = vol_u8.astype(np.float32)
-    W2, H2, D2 = 2*W-1, 2*H-1, 2*D-1
-    U_lo = np.empty((W2, H2, D2), np.float32)
-    U_hi = np.empty((W2, H2, D2), np.float32)
-    U_lo[::2,::2,::2] = s; U_hi[::2,::2,::2] = s
-    for a, b, sl in [
-        (s[:-1,:,:], s[1:,:,:], (np.s_[1::2], np.s_[::2],  np.s_[::2])),
-        (s[:,:-1,:], s[:,1:,:], (np.s_[::2],  np.s_[1::2], np.s_[::2])),
-        (s[:,:,:-1], s[:,:,1:], (np.s_[::2],  np.s_[::2],  np.s_[1::2])),
-    ]:
-        U_lo[sl] = np.minimum(a, b); U_hi[sl] = np.maximum(a, b)
-    def mm4(f, *c): return f(f(c[0], c[1]), f(c[2], c[3]))
-    U_lo[1::2,1::2,::2] = mm4(np.minimum,s[:-1,:-1,:],s[1:,:-1,:],s[:-1,1:,:],s[1:,1:,:])
-    U_hi[1::2,1::2,::2] = mm4(np.maximum,s[:-1,:-1,:],s[1:,:-1,:],s[:-1,1:,:],s[1:,1:,:])
-    U_lo[1::2,::2,1::2] = mm4(np.minimum,s[:-1,:,:-1],s[1:,:,:-1],s[:-1,:,1:],s[1:,:,1:])
-    U_hi[1::2,::2,1::2] = mm4(np.maximum,s[:-1,:,:-1],s[1:,:,:-1],s[:-1,:,1:],s[1:,:,1:])
-    U_lo[::2,1::2,1::2] = mm4(np.minimum,s[:,:-1,:-1],s[:,1:,:-1],s[:,:-1,1:],s[:,1:,1:])
-    U_hi[::2,1::2,1::2] = mm4(np.maximum,s[:,:-1,:-1],s[:,1:,:-1],s[:,:-1,1:],s[:,1:,1:])
-    c = np.stack([s[:-1,:-1,:-1],s[1:,:-1,:-1],s[:-1,1:,:-1],s[1:,1:,:-1],
-                  s[:-1,:-1,1:], s[1:,:-1,1:], s[:-1,1:,1:], s[1:,1:,1:]])
-    U_lo[1::2,1::2,1::2] = c.min(0); U_hi[1::2,1::2,1::2] = c.max(0)
-    return (np.pad(U_lo, 1, constant_values=0.0),
-            np.pad(U_hi, 1, constant_values=0.0), 0.0)
- 
- 
-def fp_cpu(U_lo_pad, U_hi_pad, l_inf=0.0):
-    """Algorithm 1 sequential FP (CPU baseline)."""
-    Wp, Hp, Dp = U_lo_pad.shape; N = Wp * Hp * Dp
-    u = np.full(N, np.nan, np.float32); dv = np.zeros(N, bool)
-    Q = defaultdict(list)
-    lo_f = U_lo_pad.ravel().astype(np.float64)
-    hi_f = U_hi_pad.ravel().astype(np.float64)
-    cur = [int(round(l_inf))]
- 
-    def push(h, lv):
-        Q[int(round(_snap(lv, lo_f[h], hi_f[h])))].append(h)
- 
-    def pop():
-        if not Q[cur[0]]:
-            occ = [lv for lv, q in Q.items() if q]
-            if not occ: return -1
-            cur[0] = min(occ, key=lambda x: abs(x - cur[0]))
-        return Q[cur[0]].pop()
- 
-    dx=[-1,1,0,0,0,0]; dy=[0,0,-1,1,0,0]; dz=[0,0,0,0,-1,1]
- 
-    def nbs(idx):
-        z=idx//(Wp*Hp); r=idx%(Wp*Hp); y=r//Wp; x=r%Wp
-        res = []
-        for i in range(6):
-            nx,ny,nz = x+dx[i],y+dy[i],z+dz[i]
-            if 0<=nx<Wp and 0<=ny<Hp and 0<=nz<Dp:
-                res.append(nx+ny*Wp+nz*Wp*Hp)
-        return res
- 
-    Q[int(round(l_inf))].append(0); dv[0] = True
-    while True:
-        h = pop()
-        if h == -1: break
-        u[h] = float(cur[0])
-        for nb in nbs(h):
-            if not dv[nb]:
-                push(nb, float(cur[0])); dv[nb] = True
-    return u.reshape(Wp, Hp, Dp)
- 
- 
+# ── CPU sequential FP: src/ddfp/cpu_fp.py 에서 import ────────────────────────
+# build_ispan_cpu, fp_cpu 는 상단 import 블록에서 로드됩니다.
+# (Algorithm 1, Boutry et al. — E-NEW-3 baseline)
+
+
 def run_enew3(vol_u8, name, K=4, delta=1, max_rounds=8) -> dict:
     """E-NEW-3: CPU vs IBI v10 numerical equivalence (Theorem 1 Step A).
  

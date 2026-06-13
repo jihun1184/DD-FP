@@ -29,6 +29,7 @@ dd-fp/
 │   ├── ddfp/
 │   │   ├── __init__.py               # Public API: immersion_pipeline, run_ddfp_2d, get_backend
 │   │   ├── gpu_immersion.py          # Level-BFS CUDA kernel + IBI driver (CuPy)
+│   │   ├── cpu_fp.py                 # CPU sequential FP — Algorithm 1 (Boutry et al.) baseline
 │   │   └── parallel_immersion.py     # CPU fallback (NumPy / SciPy)
 │   ├── preprocessing/
 │   │   └── preprocessor.py           # NoInterpPreprocessor, NaiveInterpPreprocessor, DDFPPreprocessor
@@ -242,11 +243,18 @@ You can replicate the boundary violation removal mechanism (Lemma 3+4) and the I
     ```bash
     python scripts/ddfp/experiment_DDFP_all.py --synth_only --skip e1b e3 --K 16 --deltas_e2 1 2 --n_trials 5
     ```
+    *Note: `--K` now directly controls which single K value E-NEW-2 runs (e.g. `--K 8` runs K=8 only). For a multi-K sweep, call `run_enew2()` directly with a custom `K_list`.*
 
 * **Full Dataset Validation (BraTS 3-D Full Sweep):**
     ```bash
     python scripts/ddfp/experiment_DDFP_all.py --brats data/BraTS2021 --n 1251 --K 8 --deltas_e1b 0 1 2 3 --deltas_e2 1 2 --max_rounds 16
     ```
+
+* **CPU vs GPU Equivalence Check (E-NEW-3 / Theorem 1 Step A):**
+    ```bash
+    python scripts/ddfp/experiment_DDFP_all.py --synth_only --skip e1b e2 --K 4
+    ```
+    The CPU sequential FP baseline (`build_ispan_cpu`, `fp_cpu`) is now isolated in `src/ddfp/cpu_fp.py` and imported by the experiment script. Pass: `max_diff_boundary < 0.5` **and** `bdry_viol == 0`.
 ---
 
 ### Note on GPU Non-Determinism in Synthetic Experiments
@@ -311,6 +319,15 @@ python scripts/analysis/analyse_epsilon.py \
   - **Fixed `run_dd_fp_round0` Overlap Bug:** Resolved an issue where expanding `z1_ext` corrupted the inner region assembly by overwriting boundary cell zones. Decoupled the logic into `z1_inner` (assembly boundary) and `z1_ext` (buffer size allocation), successfully achieving exactly 0 violations for $\delta \ge 1$ in `synth_gaussian`.
   - **Rationalized `step_ok` Judgment:** Fixed a false-negative classification where monotonic volumes (`synth_ramp_z`) triggered a `FAIL` status because they naturally yielded 0 violations at $\delta=0$. Aligned the logic with Lemma 4's strict criteria (focusing solely on guaranteeing 0 violations when $\delta \ge 1$).
   - **Added Statistical Logging:** Integrated the `--n_trials` argument to natively compute and display mean, standard deviation, min, and max values across multiple evaluation runs.
+
+- **`experiment_DDFP_all.py` (κ theory alignment & E-NEW-2 output expansion)**
+  - **`_compute_kappa` → `_compute_kappa_theory`:** The kappa estimator was rewritten to match Supplementary Definition S6.10 exactly. The old implementation computed `max − min` over a 3D box around each boundary voxel, which systematically overestimates κ. The new implementation measures the spatial maximum of `|v[:,:,z_b] − v[:,:,z_b−1]|` over the z-direction 1-cell layer at each boundary, and returns a `(kappa_med, kappa_max)` tuple instead of a single float. Note that on step volumes `kappa_max` and `kappa_med` can diverge substantially (e.g. `kappa_max=200` at a 0→200 jump while `kappa_med=0` over uniform slices).
+  - **`run_enew2` output expansion:** The single `kappa` column in the per-K table is replaced by five columns — `k_med`, `k_max`, `σ̃`, `eq10_rhs`, `eq10_ok` — where `eq10_ok` flags whether the sufficient condition $D_{\mathrm{sub}} \ge 2(\delta + \kappa_{\max} + 1)$ (Eq. 10) is satisfied.
+  - **`--K` wired into E-NEW-2:** `K_list=[2,4,8,16]` in `main()` is replaced by `K_list=[args.K]`, so `--K 8` runs K=8 only and `--K 16` runs K=16 only. For a full multi-K sweep, call `run_enew2()` directly with an explicit `K_list`.
+  - **`_print_sor_verify_table` column addition:** Added a `kappa_max` aggregate column to the `tab:sor-verify` printout, enabling direct comparison of worst-case κ against the Eq. 10 sufficient condition per (K, δ) cell.
+
+- **`src/ddfp/cpu_fp.py` (new module — CPU sequential FP baseline)**
+  - Extracted `_snap`, `build_ispan_cpu`, and `fp_cpu` out of `experiment_DDFP_all.py` into a standalone `src/ddfp/cpu_fp.py` module. The experiment script now imports them with `from src.ddfp.cpu_fp import build_ispan_cpu, fp_cpu`. All function signatures and numerical behaviour are unchanged; the refactor is purely organisational.
 
 ---
 
