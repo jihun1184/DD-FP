@@ -27,7 +27,7 @@ results/
 scripts/walltime
 
 # ── Timing CSVs (provided as release assets) ─────────────────────────────────
-timing_*.csv
+*.csv
 *.json
 
 # ── Jupyter / IPython ────────────────────────────────────────────────────────

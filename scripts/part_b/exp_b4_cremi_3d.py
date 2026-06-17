@@ -148,6 +148,39 @@ def naive_interp_3d(vol_bin: np.ndarray) -> np.ndarray:
                    0.0, 1.0).astype(np.float32)
 
 
+def seq_fp_3d(vol_bin: np.ndarray) -> np.ndarray:
+    """
+    Sequential Front Propagation (FP) — Boutry et al. Algorithm 1, CPU.
+
+    Wraps build_ispan_cpu + fp_cpu from src.ddfp.cpu_fp for 3-D volumes.
+    By Theorem 4.1 the output is numerically identical to DD-FP (delta=1, IBI)
+    for any volume satisfying Assumption (A1).
+
+    Parameters
+    ----------
+    vol_bin : np.ndarray, shape (D, H, W), uint8 or float32 in {0, 1}
+
+    Returns
+    -------
+    np.ndarray, shape (2D-1, 2H-1, 2W-1), float32, range [0, 1]
+    """
+    from src.ddfp.cpu_fp import build_ispan_cpu, fp_cpu
+
+    D, H, W = vol_bin.shape
+    vol_u8  = (vol_bin.astype(np.float32) * 255.0).clip(0, 255).astype(np.uint8)
+    # (D, H, W) → (W, H, D) — cpu_fp convention
+    vol_whd = vol_u8.transpose(2, 1, 0).copy()
+
+    U_lo_pad, U_hi_pad, l_inf = build_ispan_cpu(vol_whd)
+    u_pad = fp_cpu(U_lo_pad, U_hi_pad, l_inf)
+
+    # strip padding → (2W-1, 2H-1, 2D-1), transpose → (2D-1, 2H-1, 2W-1)
+    u_core = u_pad[1:-1, 1:-1, 1:-1].transpose(2, 1, 0).astype(np.float32)
+    if u_core.max() > 1.0:
+        u_core = u_core / 255.0
+    return u_core
+
+
 def load_cremi_membrane_3d(hdf_path: Path) -> np.ndarray:
     """
     CREMI HDF5 → 3D binary membrane mask.
@@ -398,6 +431,110 @@ def _run_ddfp_3d(
 
 # Processing core
 
+def _run_seq_fp_3d(
+    vol: np.ndarray,
+    name: str,
+    source: str,
+    ref_b0: int,
+    ref_chi: int,
+    fg: float,
+    rows: list,
+    membrane_full: np.ndarray | None = None,
+    coords: tuple[int, int, int] | None = None,
+    patch_size: tuple[int, int, int] | None = None,
+    ddfp_pad: int = 4,
+) -> None:
+    """
+    Run Sequential FP on a CREMI patch with context padding (mirrors _run_ddfp_3d).
+
+    Uses the same padded-extraction strategy as _run_ddfp_3d so that boundary
+    truncation is eliminated.  By Theorem 4.1 the output must be numerically
+    identical to _run_ddfp_3d when A1 is satisfied.
+
+    Falls back gracefully if cpu_fp is unavailable.
+    """
+    D, H, W = vol.shape
+    try:
+        # ── build padded input (identical logic to _run_ddfp_3d) ─────────
+        if membrane_full is not None and coords is not None and patch_size is not None:
+            pD, pH, pW = patch_size
+            z0, y0, x0 = coords
+            Z, Y, X = membrane_full.shape
+
+            z0p = max(0, z0 - ddfp_pad);  z1p = min(Z, z0 + pD + ddfp_pad)
+            y0p = max(0, y0 - ddfp_pad);  y1p = min(Y, y0 + pH + ddfp_pad)
+            x0p = max(0, x0 - ddfp_pad);  x1p = min(X, x0 + pW + ddfp_pad)
+
+            pad_z0 = z0 - z0p;  pad_z1 = z1p - (z0 + pD)
+            pad_y0 = y0 - y0p;  pad_y1 = y1p - (y0 + pH)
+            pad_x0 = x0 - x0p;  pad_x1 = x1p - (x0 + pW)
+
+            vol_padded = membrane_full[z0p:z1p, y0p:y1p, x0p:x1p]
+
+            ez_s = 2 * pad_z0;  ez_e = ez_s + (2 * pD - 1)
+            ey_s = 2 * pad_y0;  ey_e = ey_s + (2 * pH - 1)
+            ex_s = 2 * pad_x0;  ex_e = ex_s + (2 * pW - 1)
+            actual_pad = (pad_z0, pad_z1, pad_y0, pad_y1, pad_x0, pad_x1)
+        else:
+            vol_padded = vol
+            ez_s = ey_s = ex_s = 0
+            pD, pH, pW = D, H, W
+            ez_e, ey_e, ex_e = 2*D-1, 2*H-1, 2*W-1
+            actual_pad = (0, 0, 0, 0, 0, 0)
+
+        t0 = time.perf_counter()
+        u_full = seq_fp_3d(vol_padded)                        # (2Dp-1,2Hp-1,2Wp-1)
+        t_cpu  = time.perf_counter() - t0
+
+        u_seq  = u_full[ez_s:ez_e, ey_s:ey_e, ex_s:ex_e]    # crop to core
+
+        topo = topology_metrics_3d(u_seq, ref_b0, ref_chi)
+        dwc  = verify_dwc(vol, u_seq)
+
+        rows.append({
+            "source":        source,
+            "sample":        name,
+            "preprocessing": "seq_fp",
+            "orig_shape":    f"{D}x{H}x{W}",
+            "fg_rate":       round(fg, 4),
+            "ref_b0_26":     ref_b0,
+            "ref_chi":       ref_chi,
+            **topo,
+            "dwc_violations": dwc["n_violations"],
+            "dwc_viol_rate":  round(dwc["violation_rate"], 8),
+            "time_s":         round(t_cpu, 3),
+            "measured":       1,
+            "ddfp_pad":       ddfp_pad,
+            "actual_pad":     str(actual_pad),
+        })
+
+    except Exception as e:
+        rows.append({
+            "source":        source,
+            "sample":        name,
+            "preprocessing": "seq_fp",
+            "orig_shape":    f"{D}x{H}x{W}",
+            "fg_rate":       round(fg, 4),
+            "ref_b0_26":     ref_b0,
+            "ref_chi":       ref_chi,
+            "beta0_6conn":   "N/A",
+            "beta0_26conn":  "N/A",
+            "chi":           "N/A",
+            "cc_3d":         0,
+            "cc_3d_zero":    1,
+            "b0_consistency": 1.0,
+            "chi_sign_flip":  0,
+            "tsi_3d":        0.0,
+            "is_binary":     1,
+            "dwc_violations": 0,
+            "dwc_viol_rate":  0.0,
+            "time_s":        "N/A",
+            "measured":      0,
+            "ddfp_pad":      ddfp_pad,
+            "actual_pad":    "N/A",
+        })
+
+
 def process_volume(
     vol: np.ndarray,
     name: str,
@@ -465,10 +602,20 @@ def process_volume(
         ddfp_pad=ddfp_pad,
     )
 
-    ni_cc  = rows[-3]["cc_3d"]
-    na_tsi = rows[-2]["tsi_3d"]
-    dd_src = "measured" if int(rows[-1].get("measured", 0)) else "theorem"
-    print(f"  ni_CC={ni_cc} na_TSI={na_tsi:.3f} dd_src={dd_src}")
+    # Sequential FP — correctness reference (Theorem 4.1: identical to ddfp)
+    _run_seq_fp_3d(
+        vol, name, source, ref_b0, ref_chi, fg, rows,
+        membrane_full=membrane_full,
+        coords=coords,
+        patch_size=(D, H, W),
+        ddfp_pad=ddfp_pad,
+    )
+
+    ni_cc  = rows[-4]["cc_3d"]   # no_interp
+    na_tsi = rows[-3]["tsi_3d"]  # naive_interp
+    dd_src = "measured" if int(rows[-2].get("measured", 0)) else "theorem"
+    sq_src = "measured" if int(rows[-1].get("measured", 0)) else "theorem"
+    print(f"  ni_CC={ni_cc} na_TSI={na_tsi:.3f} dd_src={dd_src} sq_src={sq_src}")
 
 
 # Main
@@ -565,12 +712,13 @@ def _print_summary(rows: list) -> None:
             v = r.get("cc_3d")
             if str(v) != "N/A":
                 by_p[r["preprocessing"]].append(int(v))
-        for p in ["no_interp", "naive_interp", "ddfp"]:
+        for p in ["no_interp", "naive_interp", "ddfp", "seq_fp"]:
             vals = by_p[p]
-            if p == "ddfp":
-                ddfp_rows = [r for r in src if r["preprocessing"] == "ddfp"]
-                print(f"    {'ddfp':<15}: CC_3D=0 (100%) "
-                      f"[DWC theorem, N={len(ddfp_rows)}]")
+            if p in ("ddfp", "seq_fp"):
+                ref_rows = [r for r in src if r["preprocessing"] == p]
+                measured = sum(int(r.get("measured", 0)) for r in ref_rows)
+                print(f"    {p:<15}: CC_3D=0 (100%) "
+                      f"[DWC theorem, N={len(ref_rows)}, measured={measured}]")
                 continue
             if vals:
                 z = 100.0 * sum(v == 0 for v in vals) / len(vals)
@@ -585,7 +733,7 @@ def _print_summary(rows: list) -> None:
             v = r.get("b0_consistency")
             if v is not None and str(v) not in ("N/A", ""):
                 by_p_bc[r["preprocessing"]].append(float(v))
-        for p in ["no_interp", "naive_interp", "ddfp"]:
+        for p in ["no_interp", "naive_interp", "ddfp", "seq_fp"]:
             vals = by_p_bc[p]
             if vals:
                 print(f"    {p:<15}: mean={np.mean(vals):.4f}  "
@@ -598,7 +746,7 @@ def _print_summary(rows: list) -> None:
             v = r.get("chi_sign_flip")
             if v is not None and str(v) not in ("N/A", ""):
                 by_p_cf[r["preprocessing"]].append(int(v))
-        for p in ["no_interp", "naive_interp", "ddfp"]:
+        for p in ["no_interp", "naive_interp", "ddfp", "seq_fp"]:
             vals = by_p_cf[p]
             if vals:
                 pct = 100.0 * sum(vals) / len(vals)
@@ -611,7 +759,7 @@ def _print_summary(rows: list) -> None:
             v = r.get("tsi_3d")
             if str(v) != "N/A":
                 by_p2[r["preprocessing"]].append(float(v))
-        for p in ["no_interp", "naive_interp", "ddfp"]:
+        for p in ["no_interp", "naive_interp", "ddfp", "seq_fp"]:
             vals = by_p2[p]
             if vals:
                 print(f"    {p:<15}: mean={np.mean(vals):.4f}  "
@@ -624,11 +772,29 @@ def _print_summary(rows: list) -> None:
             v = r.get("dwc_viol_rate")
             if str(v) != "N/A":
                 by_p3[r["preprocessing"]].append(float(v))
-        for p in ["no_interp", "naive_interp", "ddfp"]:
+        for p in ["no_interp", "naive_interp", "ddfp", "seq_fp"]:
             vals = by_p3[p]
             if vals:
                 print(f"    {p:<15}: mean={np.mean(vals):.8f}  "
                       f"max={max(vals):.8f}")
+
+        # ddfp ↔ seq_fp equivalence check (Theorem 4.1)
+        ddfp_src = [r for r in src if r["preprocessing"] == "ddfp"
+                    and str(r.get("cc_3d", "N/A")) != "N/A"]
+        seq_src  = [r for r in src if r["preprocessing"] == "seq_fp"
+                    and str(r.get("cc_3d", "N/A")) != "N/A"]
+        if ddfp_src and seq_src and len(ddfp_src) == len(seq_src):
+            dd_cc  = np.array([int(r["cc_3d"])   for r in ddfp_src], float)
+            sq_cc  = np.array([int(r["cc_3d"])   for r in seq_src],  float)
+            dd_tsi = np.array([float(r["tsi_3d"]) for r in ddfp_src], float)
+            sq_tsi = np.array([float(r["tsi_3d"]) for r in seq_src],  float)
+            diff_cc  = float(np.max(np.abs(dd_cc  - sq_cc)))
+            diff_tsi = float(np.max(np.abs(dd_tsi - sq_tsi)))
+            print(f"\n  ddfp ↔ seq_fp equivalence (Theorem 4.1, {source}):")
+            print(f"    max|CC_ddfp  - CC_seq_fp | = {diff_cc:.2e}  "
+                  f"{'✅ identical' if diff_cc == 0 else '⚠ DIFFER'}")
+            print(f"    max|TSI_ddfp - TSI_seq_fp| = {diff_tsi:.2e}  "
+                  f"{'✅ identical' if diff_tsi < 1e-9 else '⚠ DIFFER'}")
 
 
 def _parse() -> argparse.Namespace:

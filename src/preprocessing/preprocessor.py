@@ -280,6 +280,91 @@ class DDFPPreprocessor(BasePreprocessor):
 
 
 # -----------------------------------------------------------------------------
+# Condition 4: seq_fp  (Sequential Front Propagation — CPU baseline)
+# -----------------------------------------------------------------------------
+
+class SeqFPPreprocessor(BasePreprocessor):
+    """
+    Sequential Flat Persistence (FP) — Boutry et al. 2015/2018 Algorithm 1.
+
+    Runs the exact CPU sequential FP on the 2-D expanded lattice.
+    By Theorem 4.1 (Main Theorem), the output is numerically identical to
+    DD-FP (delta=1, IBI) for any input satisfying Assumption (A1).
+    This preprocessor is included as an explicit correctness reference for
+    Part B topology experiments so that reviewers can verify the equivalence
+    empirically rather than relying on the theorem alone.
+
+    Implementation: src.ddfp.cpu_fp.build_ispan_cpu + fp_cpu
+      The 3-D cpu_fp is adapted for 2-D by treating the input as a
+      degenerate volume of depth 1: shape (W, H, 1).
+
+    DWC guarantee: Yes (identical to sequential FP by construction).
+    Cache: cfg.preprocessing.seq_fp_cache_dir (default None)
+
+    Performance note
+    ----------------
+    cpu_fp runs in O(N log N) with a bucket queue, where N = (2H-1)*(2W-1).
+    For DRIVE (565x584) this takes ~30 s per image on a single CPU core.
+    For BraTS 3D volumes the dedicated seq_fp_3d() helper in exp_b3 is
+    used instead (this class is for 2-D experiments only).
+    """
+
+    def __init__(self, cfg: SimpleNamespace) -> None:
+        cache = getattr(cfg.preprocessing, "seq_fp_cache_dir", None)
+        self._cache_dir = Path(cache) if cache is not None else None
+
+        try:
+            from src.ddfp.cpu_fp import build_ispan_cpu, fp_cpu
+            self._build_ispan = build_ispan_cpu
+            self._fp_cpu      = fp_cpu
+        except ImportError as e:
+            raise ImportError(
+                "[SeqFP] src.ddfp.cpu_fp not found. "
+                "Check that src/ddfp/cpu_fp.py is present."
+            ) from e
+
+    def _compute(self, image: np.ndarray) -> np.ndarray:
+        """
+        Run 2-D sequential FP via the 3-D cpu_fp with depth=1.
+
+        Steps
+        -----
+        1. Scale float32 [0,1] → uint8 [0,255] (cpu_fp expects uint8).
+        2. Reshape (H, W) → (W, H, 1) to match cpu_fp's (W, H, D) convention.
+        3. Call build_ispan_cpu + fp_cpu.
+        4. Strip padding: [1:-1, 1:-1, 1:-1] → remove the 1-cell border.
+        5. Squeeze depth-1 axis → (2H-1, 2W-1) float32, normalise to [0,1].
+        """
+        h, w = image.shape
+
+        # [0,1] float32 → [0,255] uint8
+        vol_u8 = (image * 255.0).clip(0, 255).astype(np.uint8)
+
+        # (H, W) → (W, H, 1)  — cpu_fp convention is (W, H, D)
+        vol_whd = vol_u8.T[:, :, np.newaxis]
+
+        U_lo_pad, U_hi_pad, l_inf = self._build_ispan(vol_whd)
+        u_pad = self._fp_cpu(U_lo_pad, U_hi_pad, l_inf)
+
+        # remove padding: [1:-1, 1:-1, 1:-1] → (2W-1, 2H-1, 1)
+        u_core = u_pad[1:-1, 1:-1, 1:-1]
+
+        # squeeze depth axis → (2W-1, 2H-1), transpose → (2H-1, 2W-1)
+        u_2d = u_core[:, :, 0].T.astype(np.float32)
+
+        # normalise uint8-scale output → [0,1]
+        if u_2d.max() > 1.0:
+            u_2d = u_2d / 255.0
+
+        return u_2d
+
+    def __call__(self, image, label=None, sample_id=None):
+        image = self._check(image, "SeqFP")
+        img_out = self._cached_call(image, sample_id)
+        return img_out, self._upsample_label(label)
+
+
+# -----------------------------------------------------------------------------
 # Factory
 # -----------------------------------------------------------------------------
 
@@ -287,6 +372,7 @@ _REGISTRY: dict[str, type[BasePreprocessor]] = {
     "no_interp":    NoInterpPreprocessor,
     "naive_interp": NaiveInterpPreprocessor,
     "ddfp":         DDFPPreprocessor,
+    "seq_fp":       SeqFPPreprocessor,
 }
 
 

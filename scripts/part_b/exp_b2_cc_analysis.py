@@ -59,6 +59,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.preprocessing.preprocessor import (
     NoInterpPreprocessor, NaiveInterpPreprocessor, DDFPPreprocessor,
+    SeqFPPreprocessor,
 )
 from types import SimpleNamespace
 
@@ -178,11 +179,13 @@ def make_preprocessors() -> dict:
         ddfp_cache_dir=None,
         no_interp_cache_dir=None,
         naive_interp_cache_dir=None,
+        seq_fp_cache_dir=None,
     ))
     return {
         "no_interp":    NoInterpPreprocessor(cfg),
         "naive_interp": NaiveInterpPreprocessor(cfg),
         "ddfp":         DDFPPreprocessor(cfg),
+        "seq_fp":       SeqFPPreprocessor(cfg),  # Sequential FP correctness reference
     }
 
 
@@ -407,7 +410,7 @@ def _print_summary(rows: list) -> None:
         by_p = collections.defaultdict(list)
         for r in thr05:
             by_p[r["preprocessing"]].append(r["cc"])
-        for p in ["no_interp", "naive_interp", "ddfp"]:
+        for p in ["no_interp", "naive_interp", "ddfp", "seq_fp"]:
             v = by_p[p]
             if v:
                 z = 100.0 * sum(x == 0 for x in v) / len(v)
@@ -419,7 +422,7 @@ def _print_summary(rows: list) -> None:
         by_p2 = collections.defaultdict(list)
         for r in thr05:
             by_p2[r["preprocessing"]].append(r["tsi"])
-        for p in ["no_interp", "naive_interp", "ddfp"]:
+        for p in ["no_interp", "naive_interp", "ddfp", "seq_fp"]:
             v = by_p2[p]
             if v:
                 print(f"    {p:<15}  mean={np.mean(v):.4f}  "
@@ -432,7 +435,7 @@ def _print_summary(rows: list) -> None:
         by_p3 = collections.defaultdict(list)
         for r in thr05:
             by_p3[r["preprocessing"]].append(float(r["b0_consistency"]))
-        for p in ["no_interp", "naive_interp", "ddfp"]:
+        for p in ["no_interp", "naive_interp", "ddfp", "seq_fp"]:
             v = by_p3[p]
             if v:
                 print(f"    {p:<15}  mean={np.mean(v):.4f}  "
@@ -444,7 +447,7 @@ def _print_summary(rows: list) -> None:
         by_p4 = collections.defaultdict(list)
         for r in thr05:
             by_p4[r["preprocessing"]].append(int(r["chi_sign_flip"]))
-        for p in ["no_interp", "naive_interp", "ddfp"]:
+        for p in ["no_interp", "naive_interp", "ddfp", "seq_fp"]:
             v = by_p4[p]
             if v:
                 pct = 100.0 * sum(v) / len(v)
@@ -463,17 +466,37 @@ def _print_summary(rows: list) -> None:
             for r in t_rows:
                 by_p[r["preprocessing"]].append(r["cc_zero"])
             parts = []
-            for p in ["no_interp", "naive_interp", "ddfp"]:
+            for p in ["no_interp", "naive_interp", "ddfp", "seq_fp"]:
                 v = by_p[p]
                 if v:
                     parts.append(f"{p}: {100*sum(v)/len(v):.0f}%")
             print(f"  thr={thr}  |  " + "  ".join(parts))
 
+    # ddfp ↔ seq_fp numerical equivalence check (Theorem 4.1)
+    synth_thr05 = [r for r in rows
+                   if r["source"] == "synthetic" and float(r["threshold"]) == 0.5]
+    if synth_thr05:
+        ddfp_cc  = [r["cc"]  for r in synth_thr05 if r["preprocessing"] == "ddfp"]
+        seq_cc   = [r["cc"]  for r in synth_thr05 if r["preprocessing"] == "seq_fp"]
+        ddfp_tsi = [r["tsi"] for r in synth_thr05 if r["preprocessing"] == "ddfp"]
+        seq_tsi  = [r["tsi"] for r in synth_thr05 if r["preprocessing"] == "seq_fp"]
+        if ddfp_cc and seq_cc and len(ddfp_cc) == len(seq_cc):
+            cc_diff  = float(np.max(np.abs(np.array(ddfp_cc,  dtype=float)
+                                           - np.array(seq_cc,  dtype=float))))
+            tsi_diff = float(np.max(np.abs(np.array(ddfp_tsi, dtype=float)
+                                           - np.array(seq_tsi, dtype=float))))
+            print(f"\n  ddfp ↔ seq_fp equivalence (Theorem 4.1 empirical check, synthetic):")
+            print(f"    max|CC_ddfp  - CC_seq_fp | = {cc_diff:.2e}  "
+                  f"{'✅ identical' if cc_diff == 0 else '⚠ DIFFER'}")
+            print(f"    max|TSI_ddfp - TSI_seq_fp| = {tsi_diff:.2e}  "
+                  f"{'✅ identical' if tsi_diff < 1e-9 else '⚠ DIFFER'}")
+
     print()
     print("Expected (paper Table 4):")
-    print("  ddfp:         CC=0 100%,  TSI=0.00,  b0_cons=1.00,  chi_flip=0%")
+    print("  ddfp/seq_fp:  CC=0 100%,  TSI=0.00,  b0_cons=1.00,  chi_flip=0%")
     print("  naive_interp: CC=0 100%,  TSI>0   ,  b0_cons=1.00,  chi_flip>0%")
     print("  no_interp:    CC>0 (thin/diagonal),  b0_cons<<1.0,  TSI=0.00")
+    print("  ddfp ≡ seq_fp by Theorem 4.1 (empirically verified above)")
 
 
 # ---------------------------------------------------------------------------

@@ -41,6 +41,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.preprocessing.preprocessor import (
     NoInterpPreprocessor, NaiveInterpPreprocessor, DDFPPreprocessor,
+    SeqFPPreprocessor,
 )
 from src.utils.benchmark_utils import verify_dwc
 from types import SimpleNamespace
@@ -161,6 +162,7 @@ def get_preprocessors(cfg: SimpleNamespace) -> dict:
         "no_interp":    NoInterpPreprocessor(cfg),
         "naive_interp": NaiveInterpPreprocessor(cfg),
         "ddfp":         DDFPPreprocessor(cfg),
+        "seq_fp":       SeqFPPreprocessor(cfg),  # Sequential FP correctness reference
     }
 
 
@@ -261,6 +263,7 @@ def main(args: argparse.Namespace) -> None:
         ddfp_cache_dir=None,
         no_interp_cache_dir=None,
         naive_interp_cache_dir=None,
+        seq_fp_cache_dir=None,
     ))
     preps = get_preprocessors(cfg)
     rows: list = []
@@ -334,7 +337,7 @@ def _print_summary(rows: list) -> None:
             by_prep[p]["chi_flip"].append(r["chi_sign_flip"])
             by_prep[p]["dwc_rate"].append(r["dwc_viol_rate"])
 
-        prep_order = ["no_interp", "naive_interp", "ddfp"]
+        prep_order = ["no_interp", "naive_interp", "ddfp", "seq_fp"]
 
         # [1] CC
         print(f"\n  CC = |β₀⁴ − β₀⁸|  (thr=0.5)")
@@ -387,9 +390,10 @@ def _print_summary(rows: list) -> None:
         if ds == "drive" and len(by_prep["ddfp"]["tsi"]) >= 5:
             print(f"\n  Wilcoxon signed-rank (one-sided less: x<y)  ← [FIX-4]")
             print(f"  direction: all tests use \"worse side x < better side y\" (less)")
-            print(f"  → CC/TSI/DWC/χ_flip: x=ddfp, y=baseline")
-            print(f"  → b0_cons:           x=baseline, y=ddfp  (higher b0_cons is better)")
+            print(f"  → CC/TSI/DWC/χ_flip: x=ddfp/seq_fp, y=baseline")
+            print(f"  → b0_cons:           x=baseline, y=ddfp/seq_fp  (higher b0_cons is better)")
             print(f"  → W=0 = all pairs differ in the same direction (complete separation)")
+            print(f"  → ddfp vs seq_fp: numerical equivalence check (expect all_ties)")
             print()
 
             # (met_name, col_key, x_prep, y_prep)
@@ -423,6 +427,46 @@ def _print_summary(rows: list) -> None:
                             "—" if res["note"] == "all_ties" else "⚠")
                     print(f"    {met_name:<9} ddfp vs {baseline:<15} "
                           f"W={w:>5}  p={pval}  {sig}  {match}{note}")
+
+            # seq_fp vs baseline (same comparison as ddfp)
+            if by_prep["seq_fp"]["tsi"]:
+                print()
+                print(f"  seq_fp vs baselines (should match ddfp results above):")
+                for met_name, key, x_fixed, y_fixed in metrics_to_test:
+                    for baseline in ["no_interp", "naive_interp"]:
+                        seq_vals  = by_prep["seq_fp"][key]
+                        base_vals = by_prep[baseline][key]
+                        if not base_vals or not seq_vals:
+                            continue
+                        if x_fixed is not None:
+                            x_vals, y_vals = seq_vals, base_vals
+                        else:
+                            x_vals, y_vals = base_vals, seq_vals
+                        res = wilcoxon_test(x_vals, y_vals)
+                        sig  = "***" if res["significant"] else "n.s."
+                        pval = f"{res['pvalue']:.2e}" if res["pvalue"] is not None else "N/A"
+                        w    = f"{res['W']:.1f}"       if res["W"] is not None else "N/A"
+                        note = f"  [{res['note']}]"    if res["note"] else ""
+                        match = "✅" if res["W"] == 0 and res["significant"] else (
+                                "—" if res["note"] == "all_ties" else "⚠")
+                        print(f"    {met_name:<9} seq_fp vs {baseline:<15} "
+                              f"W={w:>5}  p={pval}  {sig}  {match}{note}")
+
+                # ddfp vs seq_fp equivalence check
+                print()
+                print(f"  ddfp ↔ seq_fp numerical equivalence (Theorem 4.1 empirical check):")
+                for met_name, key in [("CC", "cc"), ("TSI", "tsi"),
+                                       ("b0_cons", "b0_cons"), ("DWC", "dwc_rate")]:
+                    ddfp_vals = by_prep["ddfp"][key]
+                    seq_vals  = by_prep["seq_fp"][key]
+                    if not ddfp_vals or not seq_vals:
+                        continue
+                    arr_d = np.array(ddfp_vals, dtype=float)
+                    arr_s = np.array(seq_vals,  dtype=float)
+                    max_diff = float(np.max(np.abs(arr_d - arr_s))) if len(arr_d) == len(arr_s) else float("nan")
+                    identical = np.allclose(arr_d, arr_s, atol=1e-5)
+                    flag = "✅" if identical else "⚠ DIFFER"
+                    print(f"    {met_name:<9}  max|ddfp-seq_fp|={max_diff:.2e}  {flag}")
 
     print("\n" + "─" * 70)
     print("─" * 70)
