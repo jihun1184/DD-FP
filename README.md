@@ -70,6 +70,8 @@ dd-fp/
 │       └── prepare_cremi.py          # CREMI HDF5 → 2-D PNG masks
 │
 ├── results/                          # Output CSVs/JSON; auto-created by scripts
+│   ├── analysis/
+│   ├── ddfp/
 │   ├── part_a/
 │   └── part_b/
 │
