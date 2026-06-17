@@ -50,10 +50,6 @@ dd-fp/
 │   │   ├── exp_b3_brats_3d_all.py       # BraTS-3D full (N=1,251)         (Table 5)
 │   │   ├── exp_b4_cremi_3d.py           # CREMI-3D membrane topology
 │   │   └── verify_wilcoxon.py           # Reproduce Wilcoxon p<0.001, W=0
-│   │   │
-│   │   │   # exp_b1–b4 each compare 4 conditions: no_interp, naive_interp,
-│   │   │   # ddfp, and seq_fp (sequential FP; Theorem 4.1 correctness
-│   │   │   # reference). seq_fp always runs on CPU via src/ddfp/cpu_fp.py.
 │   │
 │   ├── ddfp/
 │   │   └── experiment_DDFP_all.py    # DD-FP IBI validation (sor_verify_full.json)
