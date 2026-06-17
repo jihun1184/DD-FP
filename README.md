@@ -49,16 +49,11 @@ dd-fp/
 │   │   ├── exp_b2_cc_analysis.py        # CC deep analysis, β₀/χ metrics
 │   │   ├── exp_b3_brats_3d_all.py       # BraTS-3D full (N=1,251)         (Table 5)
 │   │   ├── exp_b4_cremi_3d.py           # CREMI-3D membrane topology
-│   │   ├── verify_wilcoxon.py           # Reproduce Wilcoxon p<0.001, W=0
+│   │   └── verify_wilcoxon.py           # Reproduce Wilcoxon p<0.001, W=0
 │   │   │
 │   │   │   # exp_b1–b4 each compare 4 conditions: no_interp, naive_interp,
 │   │   │   # ddfp, and seq_fp (sequential FP; Theorem 4.1 correctness
 │   │   │   # reference). seq_fp always runs on CPU via src/ddfp/cpu_fp.py.
-│   │   │
-│   │   ├── run_seqfp_b1.py              # append seq_fp rows to an existing
-│   │   ├── run_seqfp_b2.py              # exp_b{1..4} CSV without recomputing
-│   │   ├── run_seqfp_b3.py              # no_interp/naive_interp/ddfp (idempotent;
-│   │   └── run_seqfp_b4.py              # already-done samples are skipped)
 │   │
 │   ├── ddfp/
 │   │   └── experiment_DDFP_all.py    # DD-FP IBI validation (sor_verify_full.json)
@@ -247,48 +242,6 @@ python scripts/part_b/exp_b4_cremi_3d.py \
 python scripts/part_b/verify_wilcoxon.py \ --dataset drive --csv results/part_b/exp_b1_drive.csv 
 ```
 
-### Adding `seq_fp` to existing results without re-running everything
-
-If `results/part_b/exp_b{1..4}_*.csv` already contains
-`no_interp` / `naive_interp` / `ddfp` rows, use the matching
-`run_seqfp_b{1..4}.py` script to compute and append only the missing
-`seq_fp` rows. Samples that already have a `seq_fp` row are skipped, so
-the script is safe to interrupt and re-run.
-
-```bash
-# preview which samples would be computed (no write)
-python scripts/part_b/run_seqfp_b1.py --dry-run \
-    --input results/part_b/exp_b1_results.csv \
-    --drive-gt data/DRIVE/training/1st_manual \
-    --cremi-gt data/CREMI/masks
-
-# append seq_fp rows in place
-python scripts/part_b/run_seqfp_b1.py \
-    --input  results/part_b/exp_b1_results.csv \
-    --output results/part_b/exp_b1_results.csv \
-    --drive-gt data/DRIVE/training/1st_manual \
-    --cremi-gt data/CREMI/masks
-
-python scripts/part_b/run_seqfp_b2.py \
-    --input  results/part_b/exp_b2_results.csv \
-    --output results/part_b/exp_b2_results.csv \
-    --drive-gt data/DRIVE/training/1st_manual \
-    --cremi-gt data/CREMI/masks
-
-# BraTS 3D — sequential FP is O(N log N) on a single CPU core and can take
-# 30–60 min per subject on a full 240x240x155 volume; start small.
-python scripts/part_b/run_seqfp_b3.py --n-subjects 3 \
-    --input  results/part_b/exp_b3_flair_all.csv \
-    --output results/part_b/exp_b3_flair_all.csv \
-    --brats-dir data/BraTS2021
-
-python scripts/part_b/run_seqfp_b4.py \
-    --input  results/part_b/exp_b4_cremi_3d_results.csv \
-    --output results/part_b/exp_b4_cremi_3d_results.csv \
-    --hdf5-dir data/CREMI/raw \
-    --ddfp-pad 8
-```
-
 **Context padding (`--ddfp-pad`) on CREMI 3D.** Patch-based 3D extraction
 needs a context halo of width $\delta$ around each patch to avoid
 boundary-truncation artifacts. DWC violations are non-monotone in
@@ -405,9 +358,6 @@ python scripts/analysis/analyse_epsilon.py \
   - All four Part B scripts now run `seq_fp` as a fourth comparison condition alongside `no_interp`, `naive_interp`, and `ddfp`.
   - `exp_b3`/`exp_b4` add `_run_seq_fp_3d_brats()` / `_run_seq_fp_3d()` helpers that mirror the existing `ddfp` runner functions, including the same padded-extraction logic in `exp_b4` (context halo around each CREMI patch before cropping back to the core region).
   - Each script's summary output now prints a `ddfp ↔ seq_fp` numerical-equivalence check (`max|Δ|` across CC, TSI, $b_0$-consistency, $\chi_\mathrm{flip}$, and DWC violation rate), empirically confirming Theorem 4.1. On the full BraTS\,2021 cohort ($N=1{,}251$) all five metrics match to `max|Δ|=0`; `ddfp` is ≈98.5× faster (mean 0.97s vs. 95.4s per subject).
-
-- **`scripts/part_b/run_seqfp_b1.py` ... `run_seqfp_b4.py` (new — seq_fp supplement runners)**
-  - Four standalone scripts that read an existing `exp_b{1..4}` results CSV, skip samples that already have a `seq_fp` row, compute `seq_fp` only for the remaining samples, and append the new rows in place. Avoids re-running the (already-completed) `no_interp` / `naive_interp` / `ddfp` conditions. Idempotent — safe to interrupt and re-run. `--dry-run` lists pending samples without writing.
 
 ---
 
