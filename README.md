@@ -32,7 +32,8 @@ dd-fp/
 │   │   ├── cpu_fp.py                 # CPU sequential FP — Algorithm 1 (Boutry et al.) baseline
 │   │   └── parallel_immersion.py     # CPU fallback (NumPy / SciPy)
 │   ├── preprocessing/
-│   │   └── preprocessor.py           # NoInterpPreprocessor, NaiveInterpPreprocessor, DDFPPreprocessor
+│   │   └── preprocessor.py           # NoInterpPreprocessor, NaiveInterpPreprocessor,
+│   │                                  # DDFPPreprocessor, SeqFPPreprocessor
 │   └── utils/
 │       └── benchmark_utils.py        # verify_dwc, generate_synthetic_volume, time_function, naive_interpolate
 │
@@ -46,9 +47,18 @@ dd-fp/
 │   ├── part_b/                       # §5.2 — Topology-stable analysis (Paper Part B)
 │   │   ├── exp_b1_topology_accuracy.py  # DRIVE / CREMI-2D TSI/CC         (Table 4)
 │   │   ├── exp_b2_cc_analysis.py        # CC deep analysis, β₀/χ metrics
-│   │   ├── exp_b3_brats_all.py          # BraTS-3D full (N=1,251)         (Table 5)
+│   │   ├── exp_b3_brats_3d_all.py       # BraTS-3D full (N=1,251)         (Table 5)
 │   │   ├── exp_b4_cremi_3d.py           # CREMI-3D membrane topology
-│   │   └── verify_wilcoxon.py           # Reproduce Wilcoxon p<0.001, W=0
+│   │   ├── verify_wilcoxon.py           # Reproduce Wilcoxon p<0.001, W=0
+│   │   │
+│   │   │   # exp_b1–b4 each compare 4 conditions: no_interp, naive_interp,
+│   │   │   # ddfp, and seq_fp (sequential FP; Theorem 4.1 correctness
+│   │   │   # reference). seq_fp always runs on CPU via src/ddfp/cpu_fp.py.
+│   │   │
+│   │   ├── run_seqfp_b1.py              # append seq_fp rows to an existing
+│   │   ├── run_seqfp_b2.py              # exp_b{1..4} CSV without recomputing
+│   │   ├── run_seqfp_b3.py              # no_interp/naive_interp/ddfp (idempotent;
+│   │   └── run_seqfp_b4.py              # already-done samples are skipped)
 │   │
 │   ├── ddfp/
 │   │   └── experiment_DDFP_all.py    # DD-FP IBI validation (sor_verify_full.json)
@@ -201,6 +211,14 @@ Results are written to `results/part_a/`.
 
 ## Part B — Topology-stable analysis (datasets required)
 
+Each of the four experiments below compares **four** conditions:
+`no_interp`, `naive_interp`, `ddfp`, and `seq_fp` (sequential FP — Boutry
+et al. Algorithm 1, run via `src/ddfp/cpu_fp.py`). `seq_fp` is included as
+an empirical correctness reference for Theorem 4.1 (`ddfp` is numerically
+identical to sequential FP); it always runs on CPU and is considerably
+slower than `ddfp`, so each script also prints a `max|Δ|` equivalence
+check between `ddfp` and `seq_fp` in its summary output.
+
 ```bash
 # 2D datasets
 python scripts/part_b/exp_b1_topology_accuracy.py \
@@ -214,7 +232,7 @@ python scripts/part_b/exp_b2_cc_analysis.py \
     --output results/part_b/exp_b2_results.csv
 
 # 3D BraTS (N=1,251 full dataset)
-python scripts/part_b/exp_b3_brats_all.py \
+python scripts/part_b/exp_b3_brats_3d_all.py \
     --brats-dir data/BraTS2021
 
 # 3D CREMI (nearest-zoom + δ=8 context padding)
@@ -228,6 +246,57 @@ python scripts/part_b/exp_b4_cremi_3d.py \
 # Reproduce Wilcoxon signed-rank (p < 0.001, W = 0)
 python scripts/part_b/verify_wilcoxon.py \ --dataset drive --csv results/part_b/exp_b1_drive.csv 
 ```
+
+### Adding `seq_fp` to existing results without re-running everything
+
+If `results/part_b/exp_b{1..4}_*.csv` already contains
+`no_interp` / `naive_interp` / `ddfp` rows, use the matching
+`run_seqfp_b{1..4}.py` script to compute and append only the missing
+`seq_fp` rows. Samples that already have a `seq_fp` row are skipped, so
+the script is safe to interrupt and re-run.
+
+```bash
+# preview which samples would be computed (no write)
+python scripts/part_b/run_seqfp_b1.py --dry-run \
+    --input results/part_b/exp_b1_results.csv \
+    --drive-gt data/DRIVE/training/1st_manual \
+    --cremi-gt data/CREMI/masks
+
+# append seq_fp rows in place
+python scripts/part_b/run_seqfp_b1.py \
+    --input  results/part_b/exp_b1_results.csv \
+    --output results/part_b/exp_b1_results.csv \
+    --drive-gt data/DRIVE/training/1st_manual \
+    --cremi-gt data/CREMI/masks
+
+python scripts/part_b/run_seqfp_b2.py \
+    --input  results/part_b/exp_b2_results.csv \
+    --output results/part_b/exp_b2_results.csv \
+    --drive-gt data/DRIVE/training/1st_manual \
+    --cremi-gt data/CREMI/masks
+
+# BraTS 3D — sequential FP is O(N log N) on a single CPU core and can take
+# 30–60 min per subject on a full 240x240x155 volume; start small.
+python scripts/part_b/run_seqfp_b3.py --n-subjects 3 \
+    --input  results/part_b/exp_b3_flair_all.csv \
+    --output results/part_b/exp_b3_flair_all.csv \
+    --brats-dir data/BraTS2021
+
+python scripts/part_b/run_seqfp_b4.py \
+    --input  results/part_b/exp_b4_cremi_3d_results.csv \
+    --output results/part_b/exp_b4_cremi_3d_results.csv \
+    --hdf5-dir data/CREMI/raw \
+    --ddfp-pad 8
+```
+
+**Context padding (`--ddfp-pad`) on CREMI 3D.** Patch-based 3D extraction
+needs a context halo of width $\delta$ around each patch to avoid
+boundary-truncation artifacts. DWC violations are non-monotone in
+$\delta$ (mirroring the BFS direction-mismatch effect of
+\S5.2.1/`tab:enew1`): on the 30 real CREMI patches, $\delta=2$ gives
+2/30 violating patches, $\delta=4$ gives 9/30, and $\delta=8$ gives 0/30.
+**Use `--ddfp-pad 8`** (the default) for all reported results; see
+Supplement S11 for the full padding-width ablation.
 
 ## DD-FP Validation (Lemma 3+4 & IBI Sweep)
 
@@ -311,7 +380,7 @@ python scripts/analysis/analyse_epsilon.py \
      - Removed `ref_vals` loading logic, drift check block, and conditional column printing from `_print_summary()`.
      - Simplified the `_row()` helper function.
 
-- **`exp_b3_brats_all.py`** / **`exp_b4_cremi_3d.py`**
+- **`exp_b3_brats_3d_all.py`** / **`exp_b4_cremi_3d.py`**
   - Implemented the `nearest-zoom` fix for `no_interp_3d`
 
 - **`experiment_DDFP_all.py` (CLI Arguments Refactoring & Bug Fix)**
@@ -328,6 +397,17 @@ python scripts/analysis/analyse_epsilon.py \
 
 - **`src/ddfp/cpu_fp.py` (new module — CPU sequential FP baseline)**
   - Extracted `_snap`, `build_ispan_cpu`, and `fp_cpu` out of `experiment_DDFP_all.py` into a standalone `src/ddfp/cpu_fp.py` module. The experiment script now imports them with `from src.ddfp.cpu_fp import build_ispan_cpu, fp_cpu`. All function signatures and numerical behaviour are unchanged; the refactor is purely organisational.
+
+- **`src/preprocessing/preprocessor.py` (new `SeqFPPreprocessor`)**
+  - Added a fourth preprocessing condition, `SeqFPPreprocessor`, wrapping `src/ddfp/cpu_fp.py`'s `build_ispan_cpu` + `fp_cpu`. 2-D inputs are reshaped to a depth-1 volume `(W, H, 1)` so the same 3-D `cpu_fp` implementation is reused for both 2-D and 3-D experiments. Registered in `_REGISTRY` as `"seq_fp"`.
+
+- **`exp_b1_topology_accuracy.py` / `exp_b2_cc_analysis.py` / `exp_b3_brats_3d_all.py` / `exp_b4_cremi_3d.py` (seq_fp integration)**
+  - All four Part B scripts now run `seq_fp` as a fourth comparison condition alongside `no_interp`, `naive_interp`, and `ddfp`.
+  - `exp_b3`/`exp_b4` add `_run_seq_fp_3d_brats()` / `_run_seq_fp_3d()` helpers that mirror the existing `ddfp` runner functions, including the same padded-extraction logic in `exp_b4` (context halo around each CREMI patch before cropping back to the core region).
+  - Each script's summary output now prints a `ddfp ↔ seq_fp` numerical-equivalence check (`max|Δ|` across CC, TSI, $b_0$-consistency, $\chi_\mathrm{flip}$, and DWC violation rate), empirically confirming Theorem 4.1. On the full BraTS\,2021 cohort ($N=1{,}251$) all five metrics match to `max|Δ|=0`; `ddfp` is ≈98.5× faster (mean 0.97s vs. 95.4s per subject).
+
+- **`scripts/part_b/run_seqfp_b1.py` ... `run_seqfp_b4.py` (new — seq_fp supplement runners)**
+  - Four standalone scripts that read an existing `exp_b{1..4}` results CSV, skip samples that already have a `seq_fp` row, compute `seq_fp` only for the remaining samples, and append the new rows in place. Avoids re-running the (already-completed) `no_interp` / `naive_interp` / `ddfp` conditions. Idempotent — safe to interrupt and re-run. `--dry-run` lists pending samples without writing.
 
 ---
 
