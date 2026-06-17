@@ -63,7 +63,7 @@ dd-fp/
 │   ├── conftest.py                   # pytest option: --run-gpu
 │   └── test_smoke.py                 # Smoke-test suite (77 tests; GPU tests auto-skipped)
 │
-├── data/                             # ← NOT committed (see §Data below)
+├── data/                             
 │   ├── BraTS2021/
 │   ├── DRIVE/
 │   └── CREMI/
