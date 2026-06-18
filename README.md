@@ -235,14 +235,14 @@ python scripts/part_b/exp_b4_cremi_3d.py \
 python scripts/part_b/verify_wilcoxon.py \ --dataset drive --csv results/part_b/exp_b1_drive.csv 
 ```
 
-**Context padding (`--ddfp-pad`) on CREMI 3D.** Patch-based 3D extraction
+<!-- **Context padding (`--ddfp-pad`) on CREMI 3D.** Patch-based 3D extraction
 needs a context halo of width $\delta$ around each patch to avoid
 boundary-truncation artifacts. DWC violations are non-monotone in
 $\delta$ (mirroring the BFS direction-mismatch effect of
 \S5.2.1/`tab:enew1`): on the 30 real CREMI patches, $\delta=2$ gives
 2/30 violating patches, $\delta=4$ gives 9/30, and $\delta=8$ gives 0/30.
 **Use `--ddfp-pad 8`** (the default) for all reported results; see
-Supplement S11 for the full padding-width ablation.
+Supplement S11 for the full padding-width ablation. -->
 
 ## DD-FP Validation (Lemma 3+4 & IBI Sweep)
 
@@ -272,12 +272,11 @@ You can replicate the boundary violation removal mechanism (Lemma 3+4) and the I
   
 ---
 
-### Note on GPU Non-Determinism in Synthetic Experiments
+<!-- ### Note on GPU Non-Determinism in Synthetic Experiments
 
 When running experiments on synthetic volumes (`synth_gaussian` or `synth_ramp_z`), you may notice that the boundary and total violation counts fluctuate slightly between runs.
 * **Cause:** This behavior stems from the parallel reduction and atomic operations inside `front_propagation_gpu`. Minor floating-point rounding variations alter the thread scheduling order, causing continuous float values sitting precisely on the threshold boundary (e.g., near 0.5) to occasionally flip. This cannot be resolved by standard random seeding.
-* **Solution & Paper Reporting:** To address this, we introduced the `--n_trials N` argument. The statistics reported in Table 2 (`tab:enew1`) of the paper reflect the `mean ± std` computed over 5 independent runs.
-* *Note: This variation **does not occur** when running real **BraTS datasets**, because the underlying MRI data consists of discrete `uint8` integers where intensity values are safely distributed far from the threshold boundaries.*
+* **Solution & Paper Reporting:** To address this, we introduced the `--n_trials N` argument. The statistics reported in Table 2 (`tab:enew1`) of the paper reflect the `mean ± std` computed over 5 independent runs. -->
 
 ## ε sensitivity experiments
 
