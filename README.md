@@ -296,7 +296,7 @@ python scripts/analysis/analyse_epsilon.py \
 
 ---
 
-## Updates & Bug Fixes
+<!-- ## Updates & Bug Fixes
 
 - **`exp_a1_correctness.py`**
   - Updated `no_interp_3d`: Changed from `max` to `nearest-zoom` 
@@ -349,7 +349,7 @@ python scripts/analysis/analyse_epsilon.py \
 - **`exp_b1_topology_accuracy.py` / `exp_b2_cc_analysis.py` / `exp_b3_brats_3d_all.py` / `exp_b4_cremi_3d.py` (seq_fp integration)**
   - All four Part B scripts now run `seq_fp` as a fourth comparison condition alongside `no_interp`, `naive_interp`, and `ddfp`.
   - `exp_b3`/`exp_b4` add `_run_seq_fp_3d_brats()` / `_run_seq_fp_3d()` helpers that mirror the existing `ddfp` runner functions, including the same padded-extraction logic in `exp_b4` (context halo around each CREMI patch before cropping back to the core region).
-  - Each script's summary output now prints a `ddfp ↔ seq_fp` numerical-equivalence check (`max|Δ|` across CC, TSI, $b_0$-consistency, $\chi_\mathrm{flip}$, and DWC violation rate), empirically confirming Theorem 4.1. On the full BraTS\,2021 cohort ($N=1{,}251$) all five metrics match to `max|Δ|=0`; `ddfp` is ≈98.5× faster (mean 0.97s vs. 95.4s per subject).
+  - Each script's summary output now prints a `ddfp ↔ seq_fp` numerical-equivalence check (`max|Δ|` across CC, TSI, $b_0$-consistency, $\chi_\mathrm{flip}$, and DWC violation rate), empirically confirming Theorem 4.1. On the full BraTS\,2021 cohort ($N=1{,}251$) all five metrics match to `max|Δ|=0`; `ddfp` is ≈98.5× faster (mean 0.97s vs. 95.4s per subject). -->
 
 ---
 
