@@ -205,12 +205,7 @@ Results are written to `results/part_a/`.
 ## Part B — Topology-stable analysis (datasets required)
 
 Each of the four experiments below compares **four** conditions:
-`no_interp`, `naive_interp`, `ddfp`, and `seq_fp` (sequential FP — Boutry
-et al. Algorithm 1, run via `src/ddfp/cpu_fp.py`). `seq_fp` is included as
-an empirical correctness reference for Theorem 4.1 (`ddfp` is numerically
-identical to sequential FP); it always runs on CPU and is considerably
-slower than `ddfp`, so each script also prints a `max|Δ|` equivalence
-check between `ddfp` and `seq_fp` in its summary output.
+`no_interp`, `naive_interp`, `seq_fp`, and `ddfp`.
 
 ```bash
 # 2D datasets
