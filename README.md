@@ -11,7 +11,7 @@
    * At $\delta=1$, the proposed **Iterative Boundary Injection (IBI)** structurally guarantees convergence to the global DWC optimum in **$R^{*} \le 2$ rounds** for any subdomain count $K$ satisfying the boundary-seed coverage condition (A1).
    * We show this bound is tight ($R^{*}=2$) at $K=16$ across all 1,251 BraTS 2021 subjects.
 * **Scalable GPU Implementation with Boundary-Seed Correction**
-   * We replace the sequential, data-dependent front-propagation sweep with a parallelized **Level-BFS** strategy.
+   * We replace the sequential, data-dependent front-propagation sweep [[Boutry et al., 2015](https://link.springer.com/chapter/10.1007/978-3-319-18720-4_47)] with a parallelized **Level-BFS** strategy.
    * To resolve the seed-frontier conflicts inherent in parallel execution, we introduce a **pinned boundary-seed injection** mechanism (Section 4.2), achieving an $O(|\tilde{D}|)$ computational complexity.
    * This implementation delivers an empirical **$\approx 11\times$ speedup** while maintaining **100% DWC correctness** across all 1,251 BraTS 2021 subjects.
 * **Topology Stability Index (TSI):** Evaluates morphological preservation across threshold ranges. A score of $\text{TSI} = 0$ denotes a perfectly stable topology, meaning absolutely no spurious topological structures (such as holes or disconnected islands) are created or destroyed during the immersion pipeline.
