@@ -140,7 +140,7 @@ pytest test/test_smoke.py -v               # GPU tests auto-skipped
 pytest test/test_smoke.py -v --run-gpu     # include GPU tests (requires CuPy)
 ```
 
-Expected: **77 passed**
+Expected: **75 passed**
 
 ---
 
