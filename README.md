@@ -16,7 +16,7 @@
    * This implementation delivers an empirical **$\approx 11\times$ speedup** while maintaining **100% DWC correctness** across all 1,251 BraTS 2021 FLAIR subjects.
 * **Topology Stability Index (TSI):** Evaluates morphological preservation across threshold ranges. A score of $\text{TSI} = 0$ denotes a perfectly stable topology, meaning absolutely no spurious topological structures (such as holes or disconnected islands) are created or destroyed during the immersion pipeline.
 
-This repository contains the source code and experiment reproduction scripts for:
+This repository contains the core modules (Level-BFS kernel and IBI driver) and experiment reproduction scripts for:
 > **DD-FP: Scalable Digitally Well-Composed Interpolation with Provable Guarantees for Topology-Stable Biomedical Image Analysis** (Preprint, Pattern Recognition, Elsevier, 2026)
 
 ---
