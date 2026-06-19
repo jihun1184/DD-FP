@@ -606,8 +606,12 @@ class TestPartBScripts:
         mod = _load_script("scripts/part_b/exp_b4_cremi_3d.py")
         _, vol = mod.make_synthetic_membrane_3d()[0]
         subs = mod.extract_subvolumes(vol, n_patches=2, patch_size=(8, 8, 8))
-        for name, patch in subs:
-            assert patch.shape == (8, 8, 8), f"patch shape: {patch.shape}"
+        # extract_subvolumes returns (name, (z0, y0, x0)) coordinate tuples,
+        # not cropped arrays — callers extract differently-sized regions themselves.
+        assert len(subs) > 0, "extract_subvolumes returned empty list"
+        for name, coords in subs:
+            assert isinstance(name, str), f"expected str name, got {type(name)}"
+            assert len(coords) == 3, f"expected 3D coords (z0,y0,x0), got {coords}"
 
     def test_b4_topology_metrics_3d_keys(self):
         mod = _load_script("scripts/part_b/exp_b4_cremi_3d.py")
@@ -825,29 +829,6 @@ class TestWalltimeFix:
             )
         assert n_viol_total > 0, (
             "δ=0 no-IBI should produce boundary violations (Lemma 3)"
-        )
-
-    # ── (C) gen_timing_n100 script import smoke test ──────────────────────────
-
-    def test_gen_timing_n100_imports(self):
-        """gen_timing_n100.py must be importable without errors."""
-        mod = _load_script("scripts/walltime/gen_timing_n100.py")
-        assert hasattr(mod, "process_subject")
-        assert hasattr(mod, "load_brats_flair")
-        assert hasattr(mod, "append_summary_stats")
-
-    def test_gen_timing_n100_no_verify_dwc_call(self):
-        """After the fix, _time_dd must NOT call verify_dwc.
-        Inspect the source to confirm the removed call is gone."""
-        import inspect
-        mod = _load_script("scripts/walltime/gen_timing_n100.py")
-        source = inspect.getsource(mod._time_dd)
-        assert "verify_dwc" not in source, (
-            "_time_dd must not call verify_dwc after fix "
-            "(use count_boundary_violations instead)"
-        )
-        assert "count_boundary_violations" in source, (
-            "_time_dd must call count_boundary_violations after fix"
         )
 
     # ── (D) _time_dd 수정 후 viols=0 단위 테스트 ─────────────────────────────

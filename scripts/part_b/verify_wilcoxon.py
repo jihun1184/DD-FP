@@ -288,6 +288,8 @@ def run_verification(
     print(f"  {n_sig}/{n_total} tests are statistically significant at α={alpha}")
     print()
 
+    return n_sig == n_total
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CLI
