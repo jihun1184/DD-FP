@@ -39,22 +39,22 @@ dd-fp/
 │
 ├── scripts/
 │   ├── part_a/                       # §5.1 — DWC correctness & efficiency (Paper Part A)
-│   │   ├── exp_a1_correctness.py     # E-NEW-1 · δ violation counts      (Table 1)
-│   │   ├── exp_a2_speedup.py         # E-NEW-3 · wall-clock speedup       (Table 3, Fig. 3a)        
-│   │   ├── exp_a3_delta.py           # E-NEW-2 · K/δ ablation             (Table 2, Fig. 3b)        
+│   │   ├── exp_a1_correctness.py     # E-NEW-1 · δ violation counts      
+│   │   ├── exp_a2_speedup.py         # E-NEW-3 · wall-clock speedup             
+│   │   ├── exp_a3_delta.py           # E-NEW-2 · K/δ ablation                     
 │   │   
 │   ├── part_b/                       # §5.2 — Topology-stable analysis (Paper Part B)
-│   │   ├── exp_b1_topology_accuracy.py  # DRIVE / CREMI-2D TSI/CC         (Table 4)
-│   │   ├── exp_b2_cc_analysis.py        # CC deep analysis, β₀/χ metrics   (Fig. 4)
-│   │   ├── exp_b3_brats_3d_all.py       # BraTS-3D full (N=1,251)         (Table 4)
-│   │   ├── exp_b4_cremi_3d.py           # CREMI-3D membrane topology     (Table 4)
+│   │   ├── exp_b1_topology_accuracy.py  # DRIVE / CREMI-2D TSI/CC         
+│   │   ├── exp_b2_cc_analysis.py        # CC deep analysis, β₀/χ metrics   
+│   │   ├── exp_b3_brats_3d_all.py       # BraTS-3D full (N=1,251)         
+│   │   ├── exp_b4_cremi_3d.py           # CREMI-3D membrane topology     
 │   │   └── verify_wilcoxon.py           # Reproduce Wilcoxon p<0.001, W=0  
 │   │
 │   ├── ddfp/
 │   │   └── experiment_DDFP_all.py    # DD-FP IBI validation (sor_verify_full.json)
 │   │
 │   └── analysis/                     # Supplementary analysis (TIPS, ε sensitivity)
-│       ├── tips.py                   # TIPS (eq:tips): N=20 paper values + N=1,251 full sweep
+│       ├── tips.py                   # TIPS (eq:tips): N=20  paper values + N=1,251 full sweep 
 │       ├── run_epsilon_sensitivity.py# E-NEW-4: ε ∈ {0.1,0.5,1.0,2.0} sweep
 │       └── analyse_epsilon.py        # Kruskal-Wallis H=0, p=1.0 (sec:enew4)
 │
