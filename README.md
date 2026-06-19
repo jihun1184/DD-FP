@@ -53,14 +53,14 @@ dd-fp/
 │   ├── ddfp/
 │   │   └── experiment_DDFP_all.py    # DD-FP IBI validation (sor_verify_full.json)
 │   │
-│   └── analysis/                     # Supplementary analysis (TIPS, ε sensitivity)
+│   └── analysis/                     
 │       ├── tips.py                   # TIPS (eq:tips): N=20  paper values + N=1,251 full sweep 
 │       ├── run_epsilon_sensitivity.py# E-NEW-4: ε ∈ {0.1,0.5,1.0,2.0} sweep
-│       └── analyse_epsilon.py        # Kruskal-Wallis H=0, p=1.0 (sec:enew4)
+│       └── analyse_epsilon.py        # Kruskal-Wallis H=0, p=1.0 
 │
 ├── test/
 │   ├── conftest.py                   # pytest option: --run-gpu
-│   └── test_smoke.py                 # Smoke-test suite (77 tests; GPU tests auto-skipped)
+│   └── test_smoke.py                 # Smoke-test suite (75 tests; GPU tests auto-skipped)
 │
 ├── data/                             
 │   ├── BraTS2021/
