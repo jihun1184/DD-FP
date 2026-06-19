@@ -39,17 +39,16 @@ dd-fp/
 │
 ├── scripts/
 │   ├── part_a/                       # §5.1 — DWC correctness & efficiency (Paper Part A)
-│   │   ├── exp_a1_correctness.py     # E-NEW-1 · δ violation counts      (Table 2, Fig. 3)
-│   │   ├── exp_a2_speedup.py         # E-NEW-3 · wall-clock speedup       (Table 3, Fig. 5)
-│   │   ├── exp_a3_delta.py           # E-NEW-2 · K/δ ablation             (Fig. 4, Fig. 6)
-│   │   └── exp_a4_scalability.py     # E-NEW-4 · linear scaling           (Fig. 7)
+│   │   ├── exp_a1_correctness.py     # E-NEW-1 · δ violation counts      (Table 1)
+│   │   ├── exp_a2_speedup.py         # E-NEW-3 · wall-clock speedup       (Table 3, Fig. 3a)        
+│   │   ├── exp_a3_delta.py           # E-NEW-2 · K/δ ablation             (Table 2, Fig. 3b)        
 │   │   
 │   ├── part_b/                       # §5.2 — Topology-stable analysis (Paper Part B)
 │   │   ├── exp_b1_topology_accuracy.py  # DRIVE / CREMI-2D TSI/CC         (Table 4)
-│   │   ├── exp_b2_cc_analysis.py        # CC deep analysis, β₀/χ metrics
-│   │   ├── exp_b3_brats_3d_all.py       # BraTS-3D full (N=1,251)         (Table 5)
-│   │   ├── exp_b4_cremi_3d.py           # CREMI-3D membrane topology
-│   │   └── verify_wilcoxon.py           # Reproduce Wilcoxon p<0.001, W=0
+│   │   ├── exp_b2_cc_analysis.py        # CC deep analysis, β₀/χ metrics   (Fig. 4)
+│   │   ├── exp_b3_brats_3d_all.py       # BraTS-3D full (N=1,251)         (Table 4)
+│   │   ├── exp_b4_cremi_3d.py           # CREMI-3D membrane topology     (Table 4)
+│   │   └── verify_wilcoxon.py           # Reproduce Wilcoxon p<0.001, W=0  
 │   │
 │   ├── ddfp/
 │   │   └── experiment_DDFP_all.py    # DD-FP IBI validation (sor_verify_full.json)
