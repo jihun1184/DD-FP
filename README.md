@@ -5,7 +5,7 @@
 
 **DD-FP** produces a Digitally Well-Composed (DWC) interpolation field from a 2-/3-D biomedical (binary/gray-scale) datasets via parallel Level-BFS front propagation and Iterative Boundary Injection (IBI). Our main contributions are threefold:
 * **Uniqueness of $\delta=1$ and Finite-Round IBI Convergence**
-   * We prove that a halo width of $\delta=1$ is the **uniquely optimal choice** (Corollary 3.14)
+   * We prove that a halo width of $\delta=1$ is the **uniquely optimal choice** (Corollary 3.9)
      * $\delta=0$ directly violates DWC correctness due to propagation path severance.
      * $\delta\ge2$ breaks the inflationary guarantee of the assembled operator, making the convergence bound ($R^*$) image- and partition-dependent rather than structurally assured.
    * At $\delta=1$, the proposed **Iterative Boundary Injection (IBI)** structurally guarantees convergence to the global DWC optimum in **$R^{*} \le 2$ rounds** for any subdomain count $K$ satisfying the boundary-seed coverage condition (A1).
@@ -17,7 +17,7 @@
 * **Topology Stability Index (TSI):** Evaluates morphological preservation across threshold ranges. A score of $\text{TSI} = 0$ denotes a perfectly stable topology, meaning absolutely no spurious topological structures (such as holes or disconnected islands) are created or destroyed during the immersion pipeline.
 
 This repository contains the core modules (Level-BFS kernel and IBI driver) and experiment reproduction scripts for:
-> **DD-FP: Scalable Digitally Well-Composed Interpolation with Provable Guarantees for Topology-Stable Biomedical Image Analysis** (Preprint, Pattern Recognition, Elsevier, 2026)
+> **DD-FP: Scalable Digitally Well-Composed Interpolation with Provable Guarantees for Topology-Stable Biomedical Image Analysis** (Under Review, Pattern Recognition, Elsevier, 2026)
 
 ---
 
@@ -87,7 +87,7 @@ dd-fp/
 |---|---|---|
 | GPU | CUDA-capable, 4 GB VRAM | NVIDIA RTX 3080 Ti Laptop (16 GB) |
 | CPU | 4 cores | Intel i9-12900H |
-| RAM | 16 GB | 32 GB |
+| RAM | 16 GB | 24 GB DDR5 |
 
 The CPU fallback (`parallel_immersion.py`) runs without a GPU but is significantly slower. Part A timing experiments require GPU.
 
@@ -101,7 +101,7 @@ Pillow        >= 9.5       # DRIVE/CREMI mask I/O
 nibabel      >= 5.0        # BraTS NIfTI loading
 h5py         >= 3.8        # CREMI HDF5 loading
 pandas       >= 2.0        # verify_wilcoxon.py
-matplotlib   >= 3.7        # exp_a4: log-log scaling plot (optional)
+matplotlib   >= 3.7        # visualization (optional)
 PyYAML       >= 6.0        # src config loader
 cupy-cudaXXX >= 12.0       # GPU support (optional; match your CUDA version)
 ```
@@ -125,7 +125,7 @@ pip install cupy-cuda12x   # example for CUDA 12.x
 All scripts are run **from the repository root**. `ROOT` is resolved automatically as `Path(__file__).resolve().parent.parent.parent`.
 
 ```bash
-git clone https://github.com/<your-org>/DD-FP.git
+git clone https://github.com/jihun1184/DD-FP.git
 cd DD-FP
 pip install -r requirements.txt
 ```
@@ -196,7 +196,6 @@ All Part A experiments generate synthetic volumes internally and require no exte
 python scripts/part_a/exp_a1_correctness.py     # ~2 min  (GPU)
 python scripts/part_a/exp_a2_speedup.py         # ~3 min  (GPU recommended)
 python scripts/part_a/exp_a3_delta.py           # ~5 min  (GPU)
-python scripts/part_a/exp_a4_scalability.py     # ~5 min  (GPU)
 ```
 
 Results are written to `results/part_a/`.
@@ -243,11 +242,11 @@ $\delta$ (mirroring the BFS direction-mismatch effect of
 **Use `--ddfp-pad 8`** (the default) for all reported results; see
 Supplement S11 for the full padding-width ablation. -->
 
-## DD-FP Validation (Lemma 3+4 & IBI Sweep)
+## DD-FP Validation (Lemma 3.4 & 3.5 and IBI Sweep)
 
-You can replicate the boundary violation removal mechanism (Lemma 3+4) and the Iterative Boundary Injection (IBI) sweep experiments using `scripts/ddfp/experiment_DDFP_all.py`.
+You can replicate the boundary violation removal mechanism (Lemma 3.4 & 3.5) and the Iterative Boundary Injection (IBI) sweep experiments using `scripts/ddfp/experiment_DDFP_all.py`.
 
-* **Verify No-IBI Results Only (E-NEW-1b / Lemma 3+4 Step-Function Test):**
+* **Verify No-IBI Results Only (E-NEW-1b / Lemma 3.4 & 3.5 Step-Function Test):**
     ```bash
     python scripts/ddfp/experiment_DDFP_all.py --synth_only --skip e2 e3 --K 16 --n_trials 5
     ```
