@@ -11,6 +11,7 @@ scipy>=1.10.0           # ndimage (label, zoom, gaussian_filter, generate_binary
 
 # ── Image I/O ─────────────────────────────────────────────────────────────────
 Pillow>=9.5.0           # exp_b1/b2: DRIVE/CREMI mask loading; prepare_cremi: PNG export
+imageio>=2.31.0         # exp_b1: additional image I/O
 
 # ── Medical image I/O ─────────────────────────────────────────────────────────
 nibabel>=5.0.0          # exp_b3, brats_timing_full, brats_n100_sampling: BraTS NIfTI
@@ -20,4 +21,4 @@ h5py>=3.8.0             # exp_b4, prepare_cremi: CREMI HDF5
 pandas>=2.0.0           # verify_wilcoxon.py
 
 # ── Visualization (optional) ──────────────────────────────────────────────────
-matplotlib>=3.7.0       # exp_a4: log-log scaling plot (skipped gracefully if absent)
+matplotlib>=3.7.0       # exp_a2, exp_a3, analyse_epsilon: plotting (skipped gracefully if absent)
