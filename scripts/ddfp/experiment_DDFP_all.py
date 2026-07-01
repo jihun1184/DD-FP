@@ -417,15 +417,16 @@ def run_enew2(vol_u8, name, K_list=None, delta=1, max_rounds=8) -> dict:
         b   = count_boundary_violations(res["u_dd"], res["boundary_z_orig"])
         ok  = b == 0
         elapsed = time.time() - t0
-        kappa = _compute_kappa(vol_u8, res["boundary_z_orig"], K)
+        kappa_median, kappa_max = _compute_kappa(vol_u8, res["boundary_z_orig"], K)
         D = vol_u8.shape[2]; D_sub = D // K; sigma_cover = D_sub // 2
         rho_pct = round(delta / D_sub * 100, 1) if D_sub > 0 else 0.0
         rows.append({"K": K, "delta": delta, "R_star": res["R_star"],
                      "bdry_viol": b, "dwc_ok": ok, "t_s": elapsed,
                      "D_sub": D_sub, "sigma_cover": sigma_cover,
-                     "kappa": round(kappa, 1), "rho_pct": rho_pct})
+                     "kappa_med": round(kappa_median, 1),
+                     "kappa_max": round(kappa_max, 1), "rho_pct": rho_pct})
         print(f"  {K:>4}  {res['R_star']:>4}  {b:>10,}  {'✅' if ok else '❌'}  "
-              f"{elapsed:>6.1f}s  D_sub={D_sub}  κ={kappa:.0f}  σ={sigma_cover}")
+              f"{elapsed:>6.1f}s  D_sub={D_sub}  κ={kappa_median:.0f}  σ={sigma_cover}")
  
     all_ok = all(r["dwc_ok"] for r in rows)
     print(f"  all K DWC: {'OK' if all_ok else 'FAIL'}")
@@ -516,7 +517,7 @@ def _print_sor_verify_table(brats_e2_results) -> None:
         hi_ci = min(1.0, centre + margin) * 100
  
         def med(key): return float(np.median([r[key] for r in rows if key in r])) if rows else 0.0
-        kappa_med = med("kappa"); D_sub_med = med("D_sub")
+        kappa_med = med("kappa_med"); D_sub_med = med("D_sub")
         sigma_med = med("sigma_cover"); rho_med = med("rho_pct")
  
         ri1 = "FIRE" if D_sub_med < TAU_MIN else "ok"
