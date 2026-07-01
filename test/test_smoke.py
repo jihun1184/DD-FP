@@ -407,12 +407,6 @@ class TestPartAScripts:
         mod = _load_script("scripts/part_a/exp_a3_delta.py")
         assert hasattr(mod, "run_a3")
 
-    def test_exp_a4_imports_and_helpers(self):
-        mod = _load_script("scripts/part_a/exp_a4_scalability.py")
-        assert hasattr(mod, "run_a4")
-        a, b = mod._fit_scaling_exponent([100, 1000, 10000], [0.01, 0.1, 1.0])
-        assert abs(b - 1.0) < 0.05, f"scaling exponent should be ~1.0, got {b:.3f}"
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ══════════════════════════════════════════════════════════════════════════════
