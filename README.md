@@ -4,19 +4,21 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 **DD-FP** produces a Digitally Well-Composed (DWC) interpolation field from a 2-/3-D biomedical (binary/gray-scale) datasets via parallel Level-BFS front propagation and Iterative Boundary Injection (IBI). Our main contributions are threefold:
+
 * **Uniqueness of $\delta=1$ and Finite-Round IBI Convergence**
-   * We prove that a halo width of $\delta=1$ is the **uniquely optimal choice** (Corollary 3.9)
-     * $\delta=0$ directly violates DWC correctness due to propagation path severance.
-     * $\delta\ge2$ breaks the inflationary guarantee of the assembled operator, making the convergence bound ($R^*$) image- and partition-dependent rather than structurally assured.
-   * At $\delta=1$, the proposed **Iterative Boundary Injection (IBI)** structurally guarantees convergence to the global DWC optimum in **$R^{*} \le 2$ rounds** for any subdomain count $K$ satisfying the boundary-seed coverage condition (A1).
-   * We show this bound is tight ($R^{*}=2$) at $K=16$ across all 1,251 BraTS 2021 FLAIR subjects.
+  * We prove that a halo width of $\delta=1$ is the **uniquely optimal choice** (Corollary 3.9)
+    * $\delta=0$ directly violates DWC correctness due to propagation path severance.
+    * $\delta\ge2$ breaks the inflationary guarantee of the assembled operator, making the convergence bound ($R^*$) image- and partition-dependent rather than structurally assured.
+  * At $\delta=1$, the proposed **Iterative Boundary Injection (IBI)** structurally guarantees convergence to the global DWC optimum in **$R^{*} \le 2$ rounds** for any subdomain count $K$ satisfying the boundary-seed coverage condition (A1).
+  * We show this bound is tight ($R^{*}=2$) at $K=16$ across all 1,251 BraTS 2021 FLAIR subjects.
 * **Scalable GPU Implementation with Boundary-Seed Correction**
-   * We replace the sequential, data-dependent front-propagation sweep [[Boutry et al., 2015](https://link.springer.com/chapter/10.1007/978-3-319-18720-4_47)] with a parallelized **Level-BFS** strategy.
-   * To resolve the seed-frontier conflicts inherent in parallel execution, we introduce a **pinned boundary-seed injection** mechanism (Section 4.2), achieving an $O(|\tilde{D}|)$ computational complexity.
-   * This implementation delivers an empirical **$\approx 11\times$ speedup** while maintaining **100% DWC correctness** across all 1,251 BraTS 2021 FLAIR subjects.
+  * We replace the sequential, data-dependent front-propagation sweep [[Boutry et al., 2015](https://link.springer.com/chapter/10.1007/978-3-319-18720-4_47)] with a parallelized **Level-BFS** strategy.
+  * To resolve the seed-frontier conflicts inherent in parallel execution, we introduce a **pinned boundary-seed injection** mechanism (Section 4.2), achieving an $O(|\tilde{D}|)$ computational complexity.
+  * This implementation delivers an empirical **$\approx 11\times$ speedup** while maintaining **100% DWC correctness** across all 1,251 BraTS 2021 FLAIR subjects.
 * **Topology Stability Index (TSI):** Evaluates morphological preservation across threshold ranges. A score of $\text{TSI} = 0$ denotes a perfectly stable topology, meaning absolutely no spurious topological structures (such as holes or disconnected islands) are created or destroyed during the immersion pipeline.
 
 This repository contains the core modules (Level-BFS kernel and IBI driver) and experiment reproduction scripts for:
+
 > **DD-FP: Scalable Digitally Well-Composed Interpolation with Provable Guarantees for Topology-Stable Biomedical Image Analysis** (Under Review, Pattern Recognition, Elsevier, 2026)
 
 ---
@@ -39,21 +41,21 @@ dd-fp/
 │
 ├── scripts/
 │   ├── part_a/                       # §5.1 — DWC correctness & efficiency (Paper Part A)
-│   │   ├── exp_a1_correctness.py     # E-NEW-1 · δ violation counts      
-│   │   ├── exp_a2_speedup.py         # E-NEW-3 · wall-clock speedup             
-│   │   ├── exp_a3_delta.py           # E-NEW-2 · K/δ ablation                     
+│   │   ├── exp_a1_correctness.py     # E-NEW-1 · δ violation counts    
+│   │   ├── exp_a2_speedup.py         # E-NEW-3 · wall-clock speedup           
+│   │   ├── exp_a3_delta.py           # E-NEW-2 · K/δ ablation                   
 │   │   
 │   ├── part_b/                       # §5.2 — Topology-stable analysis (Paper Part B)
-│   │   ├── exp_b1_topology_accuracy.py  # DRIVE / CREMI-2D TSI/CC         
+│   │   ├── exp_b1_topology_accuracy.py  # DRIVE / CREMI-2D TSI/CC       
 │   │   ├── exp_b2_cc_analysis.py        # CC deep analysis, β₀/χ metrics   
-│   │   ├── exp_b3_brats_3d_all.py       # BraTS-3D full (N=1,251)         
-│   │   ├── exp_b4_cremi_3d.py           # CREMI-3D membrane topology     
+│   │   ├── exp_b3_brats_3d_all.py       # BraTS-3D full (N=1,251)       
+│   │   ├── exp_b4_cremi_3d.py           # CREMI-3D membrane topology   
 │   │   └── verify_wilcoxon.py           # Reproduce Wilcoxon p<0.001, W=0  
 │   │
 │   ├── ddfp/
 │   │   └── experiment_DDFP_all.py    # DD-FP IBI validation (sor_verify_full.json)
 │   │
-│   └── analysis/                     
+│   └── analysis/                   
 │       ├── tips.py                   # TIPS (eq:tips): N=20  paper values + N=1,251 full sweep 
 │       ├── run_epsilon_sensitivity.py# E-NEW-4: ε ∈ {0.1,0.5,1.0,2.0} sweep
 │       └── analyse_epsilon.py        # Kruskal-Wallis H=0, p=1.0 
@@ -62,7 +64,7 @@ dd-fp/
 │   ├── conftest.py                   # pytest option: --run-gpu
 │   └── test_smoke.py                 # Smoke-test suite (75 tests; GPU tests auto-skipped)
 │
-├── data/                             
+├── data/                           
 │   ├── BraTS2021/
 │   ├── DRIVE/
 │   └── CREMI/
@@ -83,11 +85,11 @@ dd-fp/
 
 ### Hardware
 
-| Component | Minimum | Used in paper |
-|---|---|---|
-| GPU | CUDA-capable, 4 GB VRAM | NVIDIA RTX 3080 Ti Laptop (16 GB) |
-| CPU | 4 cores | Intel i9-12900H |
-| RAM | 16 GB | 24 GB DDR5 |
+| Component | Minimum                 | Used in paper                     |
+| --------- | ----------------------- | --------------------------------- |
+| GPU       | CUDA-capable, 4 GB VRAM | NVIDIA RTX 3080 Ti Laptop (16 GB) |
+| CPU       | 4 cores                 | Intel i9-12900H                   |
+| RAM       | 16 GB                   | 24 GB DDR5                        |
 
 The CPU fallback (`parallel_immersion.py`) runs without a GPU but is significantly slower. Part A timing experiments require GPU.
 
@@ -139,7 +141,7 @@ pytest test/test_smoke.py -v               # GPU tests auto-skipped
 pytest test/test_smoke.py -v --run-gpu     # include GPU tests (requires CuPy)
 ```
 
-Expected: **75 passed**
+Expected: **==74== passed**
 
 ---
 
@@ -230,7 +232,7 @@ python scripts/part_b/exp_b4_cremi_3d.py \
     --output results/part_b/exp_b4_cremi_3d_results.csv
 
 # Reproduce Wilcoxon signed-rank (p < 0.001, W = 0)
-python scripts/part_b/verify_wilcoxon.py \ --dataset drive --csv results/part_b/exp_b1_drive.csv 
+python scripts/part_b/verify_wilcoxon.py \ --dataset drive --csv results/part_b/exp_b1_drive.csv
 ```
 
 <!-- **Context padding (`--ddfp-pad`) on CREMI 3D.** Patch-based 3D extraction
@@ -247,27 +249,30 @@ Supplement S11 for the full padding-width ablation. -->
 You can replicate the boundary violation removal mechanism (Lemma 3.4 & 3.5) and the Iterative Boundary Injection (IBI) sweep experiments using `scripts/ddfp/experiment_DDFP_all.py`.
 
 * **Verify No-IBI Results Only (E-NEW-1b / Lemma 3.4 & 3.5 Step-Function Test):**
-    ```bash
-    python scripts/ddfp/experiment_DDFP_all.py --synth_only --skip e2 e3 --K 16 --n_trials 5
-    ```
-    *Note: The `--n_trials 5` flag automatically runs the experiment 5 times and outputs a `mean ± std` statistical table to account for GPU non-determinism.*
 
+  ```bash
+  python scripts/ddfp/experiment_DDFP_all.py --synth_only --skip e2 e3 --K 16 --n_trials 5
+  ```
+
+  *Note: The `--n_trials 5` flag automatically runs the experiment 5 times and outputs a `mean ± std` statistical table to account for GPU non-determinism.*
 * **Verify IBI Results Only (E-NEW-2 / Practical Range Test):**
-    ```bash
-    python scripts/ddfp/experiment_DDFP_all.py --synth_only --skip e1b e3 --K 16 --deltas_e2 1 2 --n_trials 5
-    ```
-    *Note: `--K` now directly controls which single K value E-NEW-2 runs (e.g. `--K 8` runs K=8 only). For a multi-K sweep, call `run_enew2()` directly with a custom `K_list`.*
 
+  ```bash
+  python scripts/ddfp/experiment_DDFP_all.py --synth_only --skip e1b e3 --K 16 --deltas_e2 1 2 --n_trials 5
+  ```
+
+  *Note: `--K` now directly controls which single K value E-NEW-2 runs (e.g. `--K 8` runs K=8 only). For a multi-K sweep, call `run_enew2()` directly with a custom `K_list`.*
 * **Full Dataset Validation (BraTS 3-D Full Sweep):**
-    ```bash
-    python scripts/ddfp/experiment_DDFP_all.py --brats data/BraTS2021 --n 1251 --K 8 --deltas_e1b 0 1 2 3 --deltas_e2 1 2 --max_rounds 16
-    ```
 
+  ```bash
+  python scripts/ddfp/experiment_DDFP_all.py --brats data/BraTS2021 --n 1251 --K 8 --deltas_e1b 0 1 2 3 --deltas_e2 1 2 --max_rounds 16
+  ```
 * **CPU vs GPU Equivalence Check (E-NEW-3 / Theorem 1 Step A):**
-    ```bash
-    python scripts/ddfp/experiment_DDFP_all.py --synth_only --skip e1b e2 --K 4
-    ```
-  
+
+  ```bash
+  python scripts/ddfp/experiment_DDFP_all.py --synth_only --skip e1b e2 --K 4
+  ```
+
 ---
 
 <!-- ### Note on GPU Non-Determinism in Synthetic Experiments
@@ -353,22 +358,22 @@ python scripts/analysis/analyse_epsilon.py \
 
 ## Environment used in the paper
 
-| Item | Version |
-|---|---|
-| OS | Ubuntu 20.04 / WSL2 (Windows 11) |
-| Python | 3.10.19 |
-| CUDA runtime | 11.8 |
-| CUDA driver | 555.97 |
-| CuPy | 13.6.0 |
-| NumPy | 2.2.6 |
-| SciPy | 1.14.1 |
-| scikit-image | 0.24.0 |
-| nibabel | 5.3.2 |
-| matplotlib | 3.9.4 |
-| tqdm | 4.67.1 |
-| GPU | NVIDIA RTX 3080 Ti Laptop (16 GB GDDR6X) |
-| CPU | Intel Core i9-12900H (14 cores, up to 5.0 GHz) |
-| System RAM | 24 GB DDR5 |
+| Item         | Version                                        |
+| ------------ | ---------------------------------------------- |
+| OS           | Ubuntu 20.04 / WSL2 (Windows 11)               |
+| Python       | 3.10.19                                        |
+| CUDA runtime | 11.8                                           |
+| CUDA driver  | 555.97                                         |
+| CuPy         | 13.6.0                                         |
+| NumPy        | 2.2.6                                          |
+| SciPy        | 1.14.1                                         |
+| scikit-image | 0.24.0                                         |
+| nibabel      | 5.3.2                                          |
+| matplotlib   | 3.9.4                                          |
+| tqdm         | 4.67.1                                         |
+| GPU          | NVIDIA RTX 3080 Ti Laptop (16 GB GDDR6X)       |
+| CPU          | Intel Core i9-12900H (14 cores, up to 5.0 GHz) |
+| System RAM   | 24 GB DDR5                                     |
 
 ---
 
