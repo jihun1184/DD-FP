@@ -417,7 +417,7 @@ def run_enew2(vol_u8, name, K_list=None, delta=1, max_rounds=8) -> dict:
         b   = count_boundary_violations(res["u_dd"], res["boundary_z_orig"])
         ok  = b == 0
         elapsed = time.time() - t0
-        kappa = _compute_kappa(vol_u8, res["boundary_z_orig"])
+        kappa = _compute_kappa(vol_u8, res["boundary_z_orig"], K)
         D = vol_u8.shape[2]; D_sub = D // K; sigma_cover = D_sub // 2
         rho_pct = round(delta / D_sub * 100, 1) if D_sub > 0 else 0.0
         rows.append({"K": K, "delta": delta, "R_star": res["R_star"],
@@ -431,12 +431,6 @@ def run_enew2(vol_u8, name, K_list=None, delta=1, max_rounds=8) -> dict:
     print(f"  all K DWC: {'OK' if all_ok else 'FAIL'}")
     return {"experiment": "E-NEW-2", "name": name, "delta": delta,
             "rows": rows, "all_K_ok": all_ok}
- 
- 
-# ── CPU sequential FP: src/ddfp/cpu_fp.py 에서 import ────────────────────────
-# build_ispan_cpu, fp_cpu 는 상단 import 블록에서 로드됩니다.
-# (Algorithm 1, Boutry et al. — E-NEW-3 baseline)
-
 
 def run_enew3(vol_u8, name, K=4, delta=1, max_rounds=8) -> dict:
     """E-NEW-3: CPU vs IBI v10 numerical equivalence (Theorem 1 Step A).
