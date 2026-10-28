@@ -6,7 +6,8 @@ Branch `cmpb-release-candidate`; base `8fdfe62` (tag `pr-2026-legacy`). No relea
 
 **Replaced (source tree = the tree used for the evaluation)**
 - `src/ddfp/cpu_fp.py`: C-order neighbour decoding (`3ce62b0d` → `8eae554f`). On non-cubic 3-D volumes the earlier file gives different output; see `docs/CPU_FP_PROVENANCE.md`.
-- `src/ddfp/gpu_immersion.py`, `scripts/ddfp/experiment_DDFP_all.py`, `test/test_smoke.py`: evaluated versions (`b784a376`, `b6a9b109`, `d1dea404`).
+- `src/ddfp/gpu_immersion.py` (`fffd21b5` → `b784a376`: routes GPU-FP to the seed-aware native worklist) and `test/test_smoke.py` (`6c2fc0b0` → `d1dea404`).
+- Unchanged from `8fdfe62`: `scripts/ddfp/experiment_DDFP_all.py` (`b6a9b109`, the evaluated DD-FP driver; with the earlier `gpu_immersion.py` it ran the earlier Level-BFS kernel, with the evaluated one it runs the worklist kernel).
 - `README.md`: rewritten for V9; earlier performance and theory claims removed (unconditional DWC, ≈ 11× algorithmic speed-up, general R\* ≤ 2 for IBI, uniquely optimal δ = 1, TSI as evidence of topology preservation).
 
 **Added**
