@@ -1,0 +1,29 @@
+{
+ "maps": 2500,
+ "runs": 7500,
+ "maps_with_branch": 81,
+ "maps_with_distinct_outputs": 0,
+ "max_distinct_outputs": 1,
+ "enumerated_leaves": 2615,
+ "enumeration_capped": 77,
+ "adm_bad": 0,
+ "A1lo": 0,
+ "A1hi": 0,
+ "A2lo": 0,
+ "A2hi": 0,
+ "range": 0,
+ "F1": 0,
+ "F2": 0,
+ "F3": 0,
+ "KL": 0,
+ "P": 0,
+ "Q": 0,
+ "TB_face": 0,
+ "TB_cube": 0,
+ "_meta": {
+  "mode": "wide",
+  "N": 2500,
+  "seed": 20261103,
+  "seconds": 276.9
+ }
+}

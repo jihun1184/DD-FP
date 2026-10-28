@@ -1,0 +1,17 @@
+{
+ "volumes": 2500,
+ "windows": 8198,
+ "windows_with_branch": 396,
+ "windows_with_distinct_outputs": 0,
+ "capped": 340,
+ "assemblies": 2500,
+ "B_dwc_violations": 0,
+ "T1_violations": 0,
+ "voxel_eq": 0,
+ "_meta": {
+  "mode": "dfs_span",
+  "N": 2500,
+  "seed": 20261102,
+  "seconds": 349.4
+ }
+}

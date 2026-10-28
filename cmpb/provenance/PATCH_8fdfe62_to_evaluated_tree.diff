@@ -1,0 +1,1478 @@
+diff --git a/src/ddfp/cpu_fp.py b/src/ddfp/cpu_fp.py
+index 2e876bc..da14919 100644
+--- a/src/ddfp/cpu_fp.py
++++ b/src/ddfp/cpu_fp.py
+@@ -205,15 +205,17 @@ def fp_cpu(
+ 
+     def nbs(idx: int) -> list[int]:
+         """Return the list of 6-neighbor linear indices for linear index idx."""
+-        z = idx // (Wp * Hp)
+-        r = idx  % (Wp * Hp)
+-        y = r // Wp
+-        x = r  % Wp
++        # NumPy ravel() is C-order for shape (Wp, Hp, Dp):
++        # z is contiguous, then y, then x.
++        x = idx // (Hp * Dp)
++        r = idx % (Hp * Dp)
++        y = r // Dp
++        z = r % Dp
+         res = []
+         for i in range(6):
+             nx, ny, nz = x + dx[i], y + dy[i], z + dz[i]
+             if 0 <= nx < Wp and 0 <= ny < Hp and 0 <= nz < Dp:
+-                res.append(nx + ny * Wp + nz * Wp * Hp)
++                res.append((nx * Hp + ny) * Dp + nz)
+         return res
+ 
+     # ── BFS propagation ──────────────────────────────────────────────────────
+diff --git a/src/ddfp/gpu_immersion.py b/src/ddfp/gpu_immersion.py
+index f50cd38..32ce743 100644
+--- a/src/ddfp/gpu_immersion.py
++++ b/src/ddfp/gpu_immersion.py
+@@ -248,10 +248,12 @@ __global__ void fp_bfs_step(
+     if (idx >= N) return;
+     if (!frontier[idx]) return;
+ 
+-    int z = idx / (Wp * Hp);
+-    int r = idx % (Wp * Hp);
+-    int y = r / Wp;
+-    int x = r % Wp;
++    // CuPy ravel() is C-order for shape (Wp, Hp, Dp):
++    // z is contiguous, then y, then x.
++    int x = idx / (Hp * Dp);
++    int r = idx % (Hp * Dp);
++    int y = r / Dp;
++    int z = r % Dp;
+ 
+     const int dx[6] = {-1, 1,  0, 0,  0, 0};
+     const int dy[6] = { 0, 0, -1, 1,  0, 0};
+@@ -264,7 +266,7 @@ __global__ void fp_bfs_step(
+         if (nx < 0 || nx >= Wp || ny < 0 || ny >= Hp || nz < 0 || nz >= Dp)
+             continue;
+ 
+-        int nidx = nx + ny * Wp + nz * Wp * Hp;
++        int nidx = (nx * Hp + ny) * Dp + nz;
+         if (visited[nidx]) continue;
+ 
+         float lo  = U_lo[nidx];
+@@ -334,10 +336,12 @@ __global__ void fp_activate_level(
+     if (idx >= N) return;
+     if (visited[idx]) return;
+ 
+-    int z = idx / (Wp * Hp);
+-    int r = idx % (Wp * Hp);
+-    int y = r / Wp;
+-    int x = r % Wp;
++    // CuPy ravel() is C-order for shape (Wp, Hp, Dp):
++    // z is contiguous, then y, then x.
++    int x = idx / (Hp * Dp);
++    int r = idx % (Hp * Dp);
++    int y = r / Dp;
++    int z = r % Dp;
+ 
+     const int dx[6] = {-1, 1,  0, 0,  0, 0};
+     const int dy[6] = { 0, 0, -1, 1,  0, 0};
+@@ -350,7 +354,7 @@ __global__ void fp_activate_level(
+         int nx = x + dx[d], ny = y + dy[d], nz = z + dz[d];
+         if (nx < 0 || nx >= Wp || ny < 0 || ny >= Hp || nz < 0 || nz >= Dp)
+             continue;
+-        if (visited[nx + ny*Wp + nz*Wp*Hp]) { has_visited_nb = true; break; }
++        if (visited[(nx * Hp + ny) * Dp + nz]) { has_visited_nb = true; break; }
+     }
+     if (!has_visited_nb) return;
+ 
+@@ -391,7 +395,7 @@ def _get_fp_kernels():
+     return _k_bfs, _k_activate
+ 
+ 
+-def front_propagation_gpu(
++def _front_propagation_gpu_legacy(
+     U_lo_pad: cp.ndarray,
+     U_hi_pad: cp.ndarray,
+     l_inf: float,
+@@ -565,6 +569,45 @@ def front_propagation_gpu(
+     return u_dwc_f.reshape(Wp, Hp, Dp)
+ 
+ 
++def front_propagation_gpu(
++    U_lo_pad: cp.ndarray,
++    U_hi_pad: cp.ndarray,
++    l_inf: float,
++    boundary_seeds: cp.ndarray = None,
++    verbose: bool = True,
++) -> cp.ndarray:
++    """Run the validated GPU-native hierarchical worklist.
++
++    This preserves the historical public API while routing both unseeded and
++    IBI boundary-seeded calls through the P2-validated native scheduler.  The
++    lower tie policy matches the frozen production choice.  Seeded calls are
++    validated fail-closed, including the production right ghost-z extension.
++    """
++    from .gpu_seed_aware_worklist import seed_aware_boutry_bucket_gpu
++
++    t0 = time.time()
++    out, meta, _ = seed_aware_boutry_bucket_gpu(
++        cp,
++        U_lo_pad,
++        U_hi_pad,
++        l_inf,
++        boundary_seeds=boundary_seeds,
++        tie_policy="lower",
++    )
++    if meta["nan_count"] != 0:
++        raise RuntimeError(
++            f"validated native worklist returned {meta['nan_count']} NaN cells"
++        )
++    if verbose:
++        print(
++            "  [FP-GPU native-worklist] "
++            f"processed={meta['processed_count']:,}/{out.size:,} "
++            f"seeds={meta.get('seed_count', 0):,} "
++            f"({time.time()-t0:.2f}s)"
++        )
++    return cp.asarray(out, dtype=cp.float32)
++
++
+ # ═══════════════════════════════════════════════════════════════════════════════
+ # §B-ext  NaN fallback + DWC verification CUDA kernels
+ # ═══════════════════════════════════════════════════════════════════════════════
+@@ -601,7 +644,8 @@ extern "C" {
+  * -----------------------------------------------------------------------------
+  */
+ __global__ void nan_fill_closest_snap(
+-    float*       u_dwc,
++    const float* u_prev,       // read-only snapshot for this launch
++    float*       u_next,       // write-only output buffer for this launch
+     const float* U_lo,
+     const float* U_hi,
+     int*         changed,
+@@ -609,12 +653,14 @@ __global__ void nan_fill_closest_snap(
+ ) {
+     int idx = blockIdx.x * blockDim.x + threadIdx.x;
+     if (idx >= Wp * Hp * Dp) return;
+-    if (!isnan(u_dwc[idx]))  return;   // skip already-confirmed pixels
++    if (!isnan(u_prev[idx])) { u_next[idx] = u_prev[idx]; return; }  // already-confirmed: carry through
+ 
+-    int z = idx / (Wp * Hp);
+-    int r = idx % (Wp * Hp);
+-    int y = r / Wp;
+-    int x = r % Wp;
++    // CuPy ravel() is C-order for shape (Wp, Hp, Dp):
++    // z is contiguous, then y, then x.
++    int x = idx / (Hp * Dp);
++    int r = idx % (Hp * Dp);
++    int y = r / Dp;
++    int z = r % Dp;
+ 
+     const int dx[6] = {-1, 1,  0, 0,  0, 0};
+     const int dy[6] = { 0, 0, -1, 1,  0, 0};
+@@ -630,7 +676,11 @@ __global__ void nan_fill_closest_snap(
+         int nx = x + dx[d], ny = y + dy[d], nz = z + dz[d];
+         if (nx < 0 || nx >= Wp || ny < 0 || ny >= Hp || nz < 0 || nz >= Dp)
+             continue;
+-        float nb = u_dwc[nx + ny*Wp + nz*Wp*Hp];
++        // Double-buffer fix: read only u_prev, a fixed snapshot for this
++        // launch. Another thread's fill result written to u_next this same
++        // launch must never be visible here -- that intra-launch
++        // read-after-write dependency was the original nondeterminism.
++        float nb = u_prev[(nx * Hp + ny) * Dp + nz];
+         if (isnan(nb)) continue;
+ 
+         // Algorithm 1 priority_push: snap(l_nb, U(p))
+@@ -644,8 +694,10 @@ __global__ void nan_fill_closest_snap(
+     }
+ 
+     if (!isnan(best_snap)) {
+-        u_dwc[idx] = best_snap;
++        u_next[idx] = best_snap;
+         atomicAdd(changed, 1);
++    } else {
++        u_next[idx] = u_prev[idx];   // still NaN: carry forward unchanged
+     }
+ }
+ 
+@@ -703,7 +755,7 @@ __global__ void dwc_check_all_blocks(
+ 
+     auto V = [&](int a, int b, int c) -> float {
+         if (a<0||a>=Wp||b<0||b>=Hp||c<0||c>=Dp) return nanf("");
+-        return u[a + b*Wp + c*Wp*Hp];
++        return u[(a * Hp + b) * Dp + c];
+     };
+ 
+     if (idx < N2d) {
+@@ -817,10 +869,10 @@ __global__ void dwc_collect_violation_pixels(
+ 
+     auto V = [&](int a, int b, int c) -> float {
+         if (a<0||a>=Wp||b<0||b>=Hp||c<0||c>=Dp) return nanf("");
+-        return u[a + b*Wp + c*Wp*Hp];
++        return u[(a * Hp + b) * Dp + c];
+     };
+     auto FI = [&](int a, int b, int c) -> int {
+-        return a + b*Wp + c*Wp*Hp;
++        return (a * Hp + b) * Dp + c;
+     };
+ 
+     if (idx < N2d) {
+@@ -927,6 +979,15 @@ def _fill_nan_neighbor_snap(
+     max_iter default is set to the grid diameter (Wp+Hp+Dp).
+     BraTS: ~1273, synthetic 32^3: ~190, CT (512^2×400): ~1424.
+     Set large enough to ensure full convergence without forced U_lo assignment.
++
++    STEP 1H-2R REPAIR: double-buffered (Jacobi-style) wavefront. Each
++    iteration's kernel launch reads only the previous iteration's fixed
++    snapshot (u_prev) and writes exclusively to a separate buffer (u_next),
++    then the two are swapped. This removes the intra-launch
++    read-after-write dependency on GPU thread-scheduling order that made
++    the original in-place kernel's output nondeterministic (Step 1H-2A:
++    FIRST_DIVERGENCE_LOCALIZED_TO_NAN_FALLBACK, subdomains 2-12,
++    BraTS2021_00150, index_only).
+     """
+     k_nan, _ = _get_nan_kernels()
+     N = Wp * Hp * Dp
+@@ -934,19 +995,23 @@ def _fill_nan_neighbor_snap(
+     grid  = (N + block - 1) // block
+     changed = cp.zeros(1, dtype=cp.int32)
+ 
++    u_prev = u_dwc_f
++    u_next = cp.empty_like(u_prev)
++
+     for it in range(max_iter):
+         changed[0] = 0
+         k_nan((grid,), (block,),
+-              (u_dwc_f, U_lo_f, U_hi_f, changed, Wp, Hp, Dp))
++              (u_prev, u_next, U_lo_f, U_hi_f, changed, Wp, Hp, Dp))
+         cp.cuda.Stream.null.synchronize()
+         n_filled = int(changed[0].item())
++        u_prev, u_next = u_next, u_prev
+         if n_filled == 0:
+             break
+         if verbose:
+-            nan_left = int(cp.isnan(u_dwc_f).sum().item())
++            nan_left = int(cp.isnan(u_prev).sum().item())
+             print(f"    [NaN-fill] iter={it+1:2d}  filled={n_filled:,}  remaining={nan_left:,}")
+ 
+-    return u_dwc_f
++    return u_prev
+ 
+ 
+ # ═══════════════════════════════════════════════════════════════════════════════
+@@ -1186,4 +1251,4 @@ if __name__ == "__main__":
+     except ImportError:
+         print("  parallel_immersion.py not found — skipping CPU comparison")
+ 
+-    print("\ngpu_immersion.py ready")
+\ No newline at end of file
++    print("\ngpu_immersion.py ready")
+diff --git a/src/ddfp/gpu_native_worklist.py b/src/ddfp/gpu_native_worklist.py
+new file mode 100644
+index 0000000..463c7dc
+--- /dev/null
++++ b/src/ddfp/gpu_native_worklist.py
+@@ -0,0 +1,707 @@
++#!/usr/bin/env python3
++"""
++step1i_gpu_native_worklist_v1.py
++================================
++
++Independent GPU-native prototype for the Step-1I hierarchical worklist.
++
++This working file is the audit-hardened v1.1 revision of the original v1
++prototype; the CUDA traversal semantics are unchanged.
++
++This file is deliberately separate from the repaired production
++``gpu_immersion.py``.  It implements only the padded, uint8-derived
++six-neighbour path used by the Step-1I diagnostic intervention:
++
++* 256 integer level buckets (0..255);
++* a device-resident pending count and pending bitset;
++* atomic first discovery of a cell;
++* one immutable ``scheduled_level[cell]`` assigned at first exposure;
++* same-level frontier closure;
++* device-side nearest occupied-level selection, including levels below the
++  current level.
++
++The intended first gate is exact equality with both the frozen diagnostic
++bucket solver and Boutry ``fp_cpu``.  This is not a drop-in replacement for
++the repository production kernel and does not implement ``boundary_seeds``.
++The current scope is intentionally fail-closed: interval endpoints must be
++finite integer-valued float32 values in [0, 255], and flat index 0 is the
++sentinel seed used by the Step-1I padded path.
++"""
++from __future__ import annotations
++
++import argparse
++import hashlib
++import json
++import math
++from pathlib import Path
++from typing import Any
++
++import numpy as np
++
++
++N_LEVELS = 256
++V_MIN = 0
++V_MAX = 255
++DEFAULT_BLOCK = 256
++IMPLEMENTATION_VERSION = "1.1-audit-hardened"
++
++
++_RAW_KERNEL_CODE = r'''
++extern "C" {
++
++__device__ __forceinline__ int snap_level(
++    int current_level,
++    float lo,
++    float hi
++) {
++    float lv = (float)current_level;
++    float snapped = (lv < lo) ? lo : ((lv > hi) ? hi : lv);
++    // Step-1I endpoints are exact integer-valued float32 values.  Keeping the
++    // CUDA round-to-nearest conversion makes the contract explicit and agrees
++    // with the diagnostic intervention's __float2int_rn path.
++    int target = __float2int_rn(snapped);
++    if (target < 0) target = 0;
++    if (target > 255) target = 255;
++    return target;
++}
++
++__global__ void activate_level(
++    float* u,
++    const int* discovered,
++    int* processed,
++    const int* scheduled_level,
++    int* frontier,
++    int* pending_count,
++    unsigned int* pending_bits,
++    int* activated_count,
++    int current_level,
++    int N
++) {
++    int idx = blockIdx.x * blockDim.x + threadIdx.x;
++    if (idx >= N) return;
++    if (!discovered[idx]) return;
++    if (processed[idx]) return;
++    if (scheduled_level[idx] != current_level) return;
++
++    if (atomicCAS(&processed[idx], 0, 1) == 0) {
++        u[idx] = (float)current_level;
++        frontier[idx] = 1;
++
++        // Activation and expansion are separate kernel launches.  Therefore
++        // no increment can race this decrement.  The bit is cleared only when
++        // this decrement consumed the last pending item in the bucket.
++        int old_count = atomicSub(&pending_count[current_level], 1);
++        if (old_count == 1) {
++            unsigned int mask = ~(1u << (current_level & 31));
++            atomicAnd(&pending_bits[current_level >> 5], mask);
++        }
++        atomicAdd(activated_count, 1);
++    }
++}
++
++__global__ void expand_frontier(
++    const float* U_lo,
++    const float* U_hi,
++    int* discovered,
++    const int* processed,
++    int* scheduled_level,
++    int* frontier,
++    int* pending_count,
++    unsigned int* pending_bits,
++    int* schedule_dir_count,
++    int current_level,
++    int Wp,
++    int Hp,
++    int Dp
++) {
++    int idx = blockIdx.x * blockDim.x + threadIdx.x;
++    int N = Wp * Hp * Dp;
++    if (idx >= N) return;
++    if (frontier[idx] == 0) return;
++
++    // Each index is owned by exactly one thread in this launch.  The atomic
++    // exchange documents the single-use frontier invariant and protects this
++    // prototype if the launch geometry is changed later.
++    if (atomicExch(&frontier[idx], 0) == 0) return;
++    if (!processed[idx]) return;
++
++    int x = idx / (Hp * Dp);
++    int rem = idx % (Hp * Dp);
++    int y = rem / Dp;
++    int z = rem % Dp;
++
++    const int dx[6] = {-1, 1, 0, 0, 0, 0};
++    const int dy[6] = {0, 0, -1, 1, 0, 0};
++    const int dz[6] = {0, 0, 0, 0, -1, 1};
++
++    for (int d = 0; d < 6; ++d) {
++        int nx = x + dx[d];
++        int ny = y + dy[d];
++        int nz = z + dz[d];
++        if (nx < 0 || nx >= Wp || ny < 0 || ny >= Hp || nz < 0 || nz >= Dp)
++            continue;
++
++        // C-order flattening for shape (Wp, Hp, Dp).
++        int nidx = (nx * Hp + ny) * Dp + nz;
++
++        // First exposure is the only event allowed to assign a schedule.
++        // All parents in this launch were activated at the same level, so a
++        // winning parent produces the same target as every other parent.
++        if (atomicCAS(&discovered[nidx], 0, 1) != 0)
++            continue;
++
++        int target = snap_level(current_level, U_lo[nidx], U_hi[nidx]);
++        scheduled_level[nidx] = target;
++        atomicAdd(&pending_count[target], 1);
++        atomicOr(&pending_bits[target >> 5], 1u << (target & 31));
++
++        if (target < current_level) atomicAdd(&schedule_dir_count[0], 1);
++        else if (target == current_level) atomicAdd(&schedule_dir_count[1], 1);
++        else atomicAdd(&schedule_dir_count[2], 1);
++    }
++}
++
++__global__ void select_next_level(
++    const int* pending_count,
++    const unsigned int* pending_bits,
++    int current_level,
++    int tie_policy,
++    int* next_level,
++    int* tie_event,
++    int* has_next
++) {
++    if (blockIdx.x != 0 || threadIdx.x != 0) return;
++
++    int best = -1;
++    int best_dist = 0x7fffffff;
++    int tied = 0;
++
++    for (int level = 0; level < 256; ++level) {
++        unsigned int mask = 1u << (level & 31);
++        if ((pending_bits[level >> 5] & mask) == 0u) continue;
++        if (pending_count[level] <= 0) continue;
++
++        int dist = (level >= current_level)
++            ? (level - current_level)
++            : (current_level - level);
++        if (dist < best_dist) {
++            best = level;
++            best_dist = dist;
++            tied = 0;
++        } else if (dist == best_dist) {
++            tied = 1;
++            if (tie_policy == 1) {
++                if (level > best) best = level;
++            } else {
++                if (level < best) best = level;
++            }
++        }
++    }
++
++    if (best < 0) {
++        *next_level = -1;
++        *tie_event = 0;
++        *has_next = 0;
++    } else {
++        *next_level = best;
++        *tie_event = tied;
++        *has_next = 1;
++    }
++}
++
++} // extern "C"
++'''
++
++
++def sha_file(path: Path) -> str:
++    return hashlib.sha256(path.read_bytes()).hexdigest()
++
++
++def sha_array(a: np.ndarray) -> str:
++    return hashlib.sha256(np.ascontiguousarray(a).tobytes()).hexdigest()
++
++
++def _validate_host_intervals(
++    lo: np.ndarray,
++    hi: np.ndarray,
++    l_inf: float,
++) -> tuple[np.ndarray, np.ndarray, int]:
++    lo = np.ascontiguousarray(np.asarray(lo, dtype=np.float32))
++    hi = np.ascontiguousarray(np.asarray(hi, dtype=np.float32))
++    if lo.shape != hi.shape or lo.ndim != 3 or lo.size == 0:
++        raise ValueError("U_lo/U_hi must be non-empty, same-shape 3D arrays")
++    if not np.all(np.isfinite(lo)) or not np.all(np.isfinite(hi)):
++        raise ValueError("U_lo/U_hi must be finite")
++    if np.any(lo > hi):
++        raise ValueError("U_lo must be <= U_hi elementwise")
++    frac = max(
++        float(np.max(np.abs(lo.astype(np.float64) - np.rint(lo.astype(np.float64))))),
++        float(np.max(np.abs(hi.astype(np.float64) - np.rint(hi.astype(np.float64))))),
++    )
++    if frac > 1e-7:
++        raise ValueError(
++            "v1 requires integer-valued interval endpoints; "
++            f"max fractional deviation={frac}"
++        )
++    if float(lo.min()) < V_MIN or float(hi.max()) > V_MAX:
++        raise ValueError("v1 requires all interval endpoints in [0, 255]")
++    l_inf_f = float(l_inf)
++    if not math.isfinite(l_inf_f):
++        raise ValueError("l_inf must be finite")
++    if abs(l_inf_f - round(l_inf_f)) > 1e-7:
++        raise ValueError(
++            "v1.1 requires integer-valued l_inf; "
++            f"got {l_inf_f}"
++        )
++    if l_inf_f < V_MIN or l_inf_f > V_MAX:
++        raise ValueError(
++            "v1.1 requires l_inf in [0, 255]; "
++            f"got {l_inf_f}"
++        )
++    l0 = int(round(l_inf_f))
++    return lo, hi, l0
++
++
++def _kernel_bundle(cp):
++    module = cp.RawModule(code=_RAW_KERNEL_CODE, options=("-std=c++17",))
++    return {
++        "activate": module.get_function("activate_level"),
++        "expand": module.get_function("expand_frontier"),
++        "select": module.get_function("select_next_level"),
++    }
++
++
++def _scalar_int(cp, a) -> int:
++    return int(cp.asnumpy(a).reshape(-1)[0])
++
++
++def _pick_next_host(counts: np.ndarray, current: int, tie_policy: str) -> tuple[int | None, bool]:
++    occupied = np.flatnonzero(np.asarray(counts) > 0)
++    if occupied.size == 0:
++        return None, False
++    distances = np.abs(occupied - current)
++    best_distance = int(distances.min())
++    candidates = occupied[distances == best_distance]
++    if tie_policy == "higher":
++        return int(candidates.max()), bool(candidates.size > 1)
++    if tie_policy == "lower":
++        return int(candidates.min()), bool(candidates.size > 1)
++    raise ValueError("tie_policy must be 'lower' or 'higher'")
++
++
++def boutry_bucket_gpu(
++    cp,
++    U_lo_pad,
++    U_hi_pad,
++    l_inf: float,
++    tie_policy: str = "lower",
++    block_size: int = DEFAULT_BLOCK,
++):
++    """Run the independent GPU-native hierarchical worklist v1.
++
++    The host launches kernels and synchronizes between closure rounds, but it
++    never performs per-cell discovery, activation, expansion, or level scans.
++    The next-level choice is made by the device ``select_next_level`` kernel;
++    the host only reads the resulting single level scalar to drive the next
++    kernel launch.  This is intentionally a correctness-first v1, not a
++    launch-overhead-optimized production implementation.
++    """
++    if tie_policy not in ("lower", "higher"):
++        raise ValueError("tie_policy must be 'lower' or 'higher'")
++    if int(block_size) <= 0:
++        raise ValueError("block_size must be positive")
++
++    lo_dev = cp.ascontiguousarray(cp.asarray(U_lo_pad, dtype=cp.float32))
++    hi_dev = cp.ascontiguousarray(cp.asarray(U_hi_pad, dtype=cp.float32))
++    lo_host, hi_host, l0 = _validate_host_intervals(
++        cp.asnumpy(lo_dev).reshape(lo_dev.shape),
++        cp.asnumpy(hi_dev).reshape(hi_dev.shape),
++        l_inf,
++    )
++    Wp, Hp, Dp = (int(v) for v in lo_host.shape)
++    N = Wp * Hp * Dp
++    lo_f = cp.ascontiguousarray(lo_dev.ravel(), dtype=cp.float32)
++    hi_f = cp.ascontiguousarray(hi_dev.ravel(), dtype=cp.float32)
++
++    u = cp.full(N, cp.nan, dtype=cp.float32)
++    discovered = cp.zeros(N, dtype=cp.int32)
++    processed = cp.zeros(N, dtype=cp.int32)
++    scheduled_level = cp.full(N, -1, dtype=cp.int32)
++    frontier = cp.zeros(N, dtype=cp.int32)
++    pending_count = cp.zeros(N_LEVELS, dtype=cp.int32)
++    pending_bits = cp.zeros((N_LEVELS + 31) // 32, dtype=cp.uint32)
++    activated_count = cp.zeros(1, dtype=cp.int32)
++    schedule_dir_count = cp.zeros(3, dtype=cp.int32)
++    next_level = cp.full(1, -1, dtype=cp.int32)
++    tie_event = cp.zeros(1, dtype=cp.int32)
++    has_next = cp.zeros(1, dtype=cp.int32)
++
++    discovered[0] = 1
++    scheduled_level[0] = l0
++    pending_count[l0] = 1
++    pending_bits[l0 >> 5] = cp.uint32(1 << (l0 & 31))
++
++    kernels = _kernel_bundle(cp)
++    block = int(block_size)
++    grid = (N + block - 1) // block
++    current = l0
++    level_transitions: list[list[int]] = []
++    closure_rounds_by_level: dict[str, int] = {}
++    total_activation_rounds = 0
++    backward_scheduler_transitions = 0
++    tie_events = 0
++    safety_limit = max(10000, N + 10 * N_LEVELS)
++
++    while True:
++        rounds = 0
++        while True:
++            current_pending = _scalar_int(cp, pending_count[current])
++            if current_pending == 0:
++                break
++
++            rounds += 1
++            total_activation_rounds += 1
++            if total_activation_rounds > safety_limit:
++                raise RuntimeError(
++                    f"safety limit exceeded ({safety_limit}) while draining level {current}"
++                )
++
++            activated_count[0] = 0
++            kernels["activate"](
++                (grid,), (block,),
++                (
++                    u,
++                    discovered,
++                    processed,
++                    scheduled_level,
++                    frontier,
++                    pending_count,
++                    pending_bits,
++                    activated_count,
++                    current,
++                    N,
++                ),
++            )
++            cp.cuda.Stream.null.synchronize()
++            activated = _scalar_int(cp, activated_count)
++            if activated <= 0:
++                remaining = _scalar_int(cp, pending_count[current])
++                raise RuntimeError(
++                    "pending-count invariant failed: "
++                    f"level {current} has {remaining} pending items but activated 0"
++                )
++
++            kernels["expand"](
++                (grid,), (block,),
++                (
++                    lo_f,
++                    hi_f,
++                    discovered,
++                    processed,
++                    scheduled_level,
++                    frontier,
++                    pending_count,
++                    pending_bits,
++                    schedule_dir_count,
++                    current,
++                    Wp,
++                    Hp,
++                    Dp,
++                ),
++            )
++            cp.cuda.Stream.null.synchronize()
++
++        closure_rounds_by_level[str(current)] = (
++            closure_rounds_by_level.get(str(current), 0) + rounds
++        )
++
++        next_level[0] = -1
++        tie_event[0] = 0
++        has_next[0] = 0
++        kernels["select"](
++            (1,), (1,),
++            (
++                pending_count,
++                pending_bits,
++                current,
++                1 if tie_policy == "higher" else 0,
++                next_level,
++                tie_event,
++                has_next,
++            ),
++        )
++        cp.cuda.Stream.null.synchronize()
++        if _scalar_int(cp, has_next) == 0:
++            break
++
++        nxt = _scalar_int(cp, next_level)
++        if _scalar_int(cp, tie_event):
++            tie_events += 1
++        if nxt < current:
++            backward_scheduler_transitions += 1
++        level_transitions.append([int(current), int(nxt)])
++        current = nxt
++
++    out = cp.asnumpy(u.reshape((Wp, Hp, Dp)))
++    discovered_np = cp.asnumpy(discovered).astype(bool).reshape((Wp, Hp, Dp))
++    processed_np = cp.asnumpy(processed).astype(bool).reshape((Wp, Hp, Dp))
++    scheduled_np = cp.asnumpy(scheduled_level).reshape((Wp, Hp, Dp))
++    pending_count_np = cp.asnumpy(pending_count)
++    pending_bits_np = cp.asnumpy(pending_bits)
++    dirs = cp.asnumpy(schedule_dir_count).astype(np.int64)
++
++    if int(pending_count_np.sum()) != 0 or bool(np.any(pending_bits_np)):
++        raise RuntimeError("worklist terminated with non-empty pending state")
++
++    meta: dict[str, Any] = {
++        "implementation": "GPU_NATIVE_WORKLIST_V1",
++        "implementation_version": IMPLEMENTATION_VERSION,
++        "bucket_count": N_LEVELS,
++        "V_MIN": V_MIN,
++        "V_MAX": V_MAX,
++        "l_inf_validated_integer": int(l0),
++        "tie_policy": tie_policy,
++        "host_per_cell_work": False,
++        "device_next_level_selection": True,
++        "host_current_bucket_polling": True,
++        "nan_count": int(np.isnan(out).sum()),
++        "discovered_count": int(discovered_np.sum()),
++        "processed_count": int(processed_np.sum()),
++        "pending_total_final": int(pending_count_np.sum()),
++        "pending_bitset_nonzero_words_final": int(np.count_nonzero(pending_bits_np)),
++        "schedule_direction_counts": {
++            "backward": int(dirs[0]),
++            "same": int(dirs[1]),
++            "forward": int(dirs[2]),
++        },
++        "scheduler_transition_count": len(level_transitions),
++        "backward_scheduler_transition_count": int(backward_scheduler_transitions),
++        "equidistant_next_level_tie_events": int(tie_events),
++        "total_activation_rounds": int(total_activation_rounds),
++        "closure_rounds_by_level": closure_rounds_by_level,
++        "level_transitions": level_transitions,
++    }
++    aux = {
++        "discovered": discovered_np,
++        "processed": processed_np,
++        "scheduled_level": scheduled_np,
++        "pending_count": pending_count_np,
++        "pending_bits": pending_bits_np,
++    }
++    return out, meta, aux
++
++
++def _neighbors(idx: int, Wp: int, Hp: int, Dp: int):
++    x = idx // (Hp * Dp)
++    rem = idx % (Hp * Dp)
++    y = rem // Dp
++    z = rem % Dp
++    if x > 0:
++        yield idx - Hp * Dp
++    if x + 1 < Wp:
++        yield idx + Hp * Dp
++    if y > 0:
++        yield idx - Dp
++    if y + 1 < Hp:
++        yield idx + Dp
++    if z > 0:
++        yield idx - 1
++    if z + 1 < Dp:
++        yield idx + 1
++
++
++def cpu_shadow_worklist_v1(
++    U_lo_pad: np.ndarray,
++    U_hi_pad: np.ndarray,
++    l_inf: float,
++    tie_policy: str = "lower",
++) -> tuple[np.ndarray, dict[str, Any]]:
++    """Small CPU shadow of the v1 state machine for no-CUDA unit tests.
++
++    This is not used as the semantic oracle.  It exists to exercise the same
++    state transitions and invariants before a CUDA host is available.
++    """
++    lo, hi, l0 = _validate_host_intervals(U_lo_pad, U_hi_pad, l_inf)
++    Wp, Hp, Dp = lo.shape
++    N = lo.size
++    lo_f, hi_f = lo.ravel(), hi.ravel()
++    out = np.full(N, np.nan, dtype=np.float32)
++    discovered = np.zeros(N, dtype=bool)
++    processed = np.zeros(N, dtype=bool)
++    scheduled = np.full(N, -1, dtype=np.int32)
++    pending: list[list[int]] = [[] for _ in range(N_LEVELS)]
++    pending_count = np.zeros(N_LEVELS, dtype=np.int64)
++
++    discovered[0] = True
++    scheduled[0] = l0
++    pending[l0].append(0)
++    pending_count[l0] += 1
++
++    dirs = np.zeros(3, dtype=np.int64)
++    transitions: list[list[int]] = []
++    tie_events = 0
++    activation_rounds = 0
++    backward_transitions = 0
++    current = l0
++
++    while True:
++        while pending_count[current] > 0:
++            activation_rounds += 1
++            frontier: list[int] = []
++            bucket = pending[current]
++            cursor = 0
++            while cursor < len(bucket):
++                idx = bucket[cursor]
++                cursor += 1
++                if not discovered[idx] or processed[idx] or scheduled[idx] != current:
++                    continue
++                processed[idx] = True
++                pending_count[current] -= 1
++                out[idx] = np.float32(current)
++                frontier.append(idx)
++
++            # The GPU version clears the frontier in one kernel and performs
++            # all claims in the next kernel.  Preserve that two-phase order.
++            for idx in frontier:
++                for nb in _neighbors(idx, Wp, Hp, Dp):
++                    if discovered[nb]:
++                        continue
++                    discovered[nb] = True
++                    lv = float(current)
++                    lov, hiv = float(lo_f[nb]), float(hi_f[nb])
++                    snapped = lov if lv < lov else (hiv if lv > hiv else lv)
++                    target = int(round(snapped))
++                    target = max(V_MIN, min(V_MAX, target))
++                    scheduled[nb] = target
++                    pending[target].append(nb)
++                    pending_count[target] += 1
++                    if target < current:
++                        dirs[0] += 1
++                    elif target == current:
++                        dirs[1] += 1
++                    else:
++                        dirs[2] += 1
++
++        nxt, tied = _pick_next_host(pending_count, current, tie_policy)
++        if nxt is None:
++            break
++        tie_events += int(tied)
++        if nxt < current:
++            backward_transitions += 1
++        transitions.append([int(current), int(nxt)])
++        current = nxt
++
++    if np.any(pending_count != 0):
++        raise RuntimeError("CPU shadow terminated with pending work")
++    if not np.all(discovered == processed):
++        raise RuntimeError("CPU shadow has discovered-but-unprocessed cells")
++
++    return out.reshape(lo.shape), {
++        "implementation": "CPU_SHADOW_ONLY",
++        "nan_count": int(np.isnan(out).sum()),
++        "discovered_count": int(discovered.sum()),
++        "processed_count": int(processed.sum()),
++        "schedule_direction_counts": {
++            "backward": int(dirs[0]),
++            "same": int(dirs[1]),
++            "forward": int(dirs[2]),
++        },
++        "backward_scheduler_transition_count": int(backward_transitions),
++        "equidistant_next_level_tie_events": int(tie_events),
++        "total_activation_rounds": int(activation_rounds),
++        "level_transitions": transitions,
++    }
++
++
++def run_core_gpu_fixture(cp) -> dict[str, Any]:
++    """The canonical 0 -> 5 -> 3 GPU-native smoke fixture."""
++    lo = np.array([[[0, 5, 0]]], dtype=np.float32)
++    hi = np.array([[[0, 5, 3]]], dtype=np.float32)
++    out, meta, _ = boutry_bucket_gpu(cp, cp.asarray(lo), cp.asarray(hi), 0.0)
++    expected = np.array([[[0, 5, 3]]], dtype=np.float32)
++    if not np.array_equal(out, expected):
++        raise RuntimeError(f"GPU_NATIVE_CORE_FIXTURE_FAIL: {out.tolist()}")
++    if meta["backward_scheduler_transition_count"] < 1:
++        raise RuntimeError("GPU_NATIVE_CORE_FIXTURE_FAIL: no backward transition")
++    return {
++        "pass": True,
++        "output": out.tolist(),
++        "expected": expected.tolist(),
++        "backward_scheduler_transition_count": meta["backward_scheduler_transition_count"],
++        "schedule_direction_counts": meta["schedule_direction_counts"],
++        "level_transitions": meta["level_transitions"],
++    }
++
++
++def cpu_shadow_self_test() -> dict[str, Any]:
++    """Run deterministic no-CUDA state-machine checks."""
++    cases = []
++    fixtures = [
++        (
++            "backward_revisit_0_5_3",
++            np.array([[[0, 5, 0]]], dtype=np.float32),
++            np.array([[[0, 5, 3]]], dtype=np.float32),
++            np.array([[[0, 5, 3]]], dtype=np.float32),
++        ),
++        (
++            "pure_forward",
++            np.array([[[0, 10, 20, 30]]], dtype=np.float32),
++            np.array([[[0, 19, 29, 39]]], dtype=np.float32),
++            np.array([[[0, 10, 20, 30]]], dtype=np.float32),
++        ),
++        (
++            "same_level_closure",
++            np.array([[[0, 100, 90, 100]]], dtype=np.float32),
++            np.array([[[0, 100, 110, 100]]], dtype=np.float32),
++            np.array([[[0, 100, 100, 100]]], dtype=np.float32),
++        ),
++    ]
++    for name, lo, hi, expected in fixtures:
++        out, meta = cpu_shadow_worklist_v1(lo, hi, 0.0)
++        ok = bool(np.array_equal(out, expected))
++        if not ok:
++            raise AssertionError(f"{name}: got {out.tolist()}, expected {expected.tolist()}")
++        cases.append(
++            {
++                "name": name,
++                "pass": True,
++                "backward_scheduler_transition_count": meta[
++                    "backward_scheduler_transition_count"
++                ],
++            }
++        )
++    rejected_l_inf = []
++    probe_lo = np.array([[[0, 5, 0]]], dtype=np.float32)
++    probe_hi = np.array([[[0, 5, 3]]], dtype=np.float32)
++    for bad_l_inf in (0.5, -1.0, 256.0):
++        try:
++            cpu_shadow_worklist_v1(probe_lo, probe_hi, bad_l_inf)
++        except ValueError:
++            rejected_l_inf.append(bad_l_inf)
++        else:
++            raise AssertionError(f"non-fail-closed l_inf accepted: {bad_l_inf}")
++    return {
++        "verdict": "CPU_SHADOW_SELF_TEST_PASS",
++        "case_count": len(cases),
++        "cases": cases,
++        "strict_l_inf_rejections": rejected_l_inf,
++        "scope": "CPU shadow only; no GPU execution",
++    }
++
++
++def main() -> int:
++    ap = argparse.ArgumentParser(description=__doc__)
++    ap.add_argument("--self-test", action="store_true", help="Run no-CUDA CPU shadow checks")
++    ap.add_argument("--out", type=Path, default=None)
++    args = ap.parse_args()
++    if not args.self_test:
++        ap.error("v1 module is a library; use --self-test or import boutry_bucket_gpu()")
++    result = cpu_shadow_self_test()
++    if args.out is not None:
++        args.out.write_text(json.dumps(result, indent=2))
++    print(json.dumps(result, indent=2))
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/src/ddfp/gpu_seed_aware_worklist.py b/src/ddfp/gpu_seed_aware_worklist.py
+new file mode 100644
+index 0000000..bebac67
+--- /dev/null
++++ b/src/ddfp/gpu_seed_aware_worklist.py
+@@ -0,0 +1,441 @@
++#!/usr/bin/env python3
++"""P2-validated seed-aware GPU-native worklist production adapter.
++
++The ``None`` and all-NaN boundary-seed paths delegate to the frozen canonical
++native-v1.1 implementation. Only a genuinely seeded call uses the kernels
++defined here. P3 changes only the canonical module's repository-relative path;
++the validated scheduling and ghost-z admission logic are preserved.
++"""
++from __future__ import annotations
++
++import hashlib
++import importlib.util
++from pathlib import Path
++from typing import Any
++
++import numpy as np
++
++
++CANONICAL_NATIVE_V1_1_SHA256 = (
++    "853bf33a6bbd9c91f5304a018f0a51ff53e8418360fe1477208cf81df17163ac"
++)
++IMPLEMENTATION_VERSION = "P2-S2c-seed-aware-gpu-prototype-v1+production-right-ghost-z-v1"
++N_LEVELS = 256
++DEFAULT_BLOCK = 256
++
++
++_SEED_INIT_KERNEL_CODE = r'''
++extern "C" __global__ void initialize_seeds(
++    const float* boundary_seeds,
++    float* u,
++    int* discovered,
++    int* scheduled_level,
++    int* is_seed,
++    int* pending_count,
++    unsigned int* pending_bits,
++    int field_v_min,
++    int field_v_max,
++    int N
++) {
++    int idx = blockIdx.x * blockDim.x + threadIdx.x;
++    if (idx >= N) return;
++    float raw = boundary_seeds[idx];
++    if (isnan(raw)) return;
++
++    // Ownership, raw output fixation, and propagation scheduling are distinct.
++    u[idx] = raw;
++    discovered[idx] = 1;
++    is_seed[idx] = 1;
++    int level = __float2int_rn(raw);
++    if (level < field_v_min) level = field_v_min;
++    if (level > field_v_max) level = field_v_max;
++    scheduled_level[idx] = level;
++    atomicAdd(&pending_count[level], 1);
++    atomicOr(&pending_bits[level >> 5], 1u << (level & 31));
++}
++'''
++
++
++def sha_file(path: Path) -> str:
++    return hashlib.sha256(path.read_bytes()).hexdigest()
++
++
++def import_by_path(name: str, path: Path):
++    spec = importlib.util.spec_from_file_location(name, path)
++    if spec is None or spec.loader is None:
++        raise ImportError(path)
++    module = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(module)
++    return module
++
++
++def load_canonical(canonical_path: Path | None = None):
++    path = canonical_path or (
++        Path(__file__).resolve().parent
++        / "gpu_native_worklist.py"
++    )
++    path = path.resolve()
++    actual = sha_file(path)
++    if actual != CANONICAL_NATIVE_V1_1_SHA256:
++        raise RuntimeError(
++            "canonical native-v1.1 hash mismatch: "
++            f"expected {CANONICAL_NATIVE_V1_1_SHA256}, got {actual}"
++        )
++    return import_by_path("_p2s2c_canonical_native_v1_1", path)
++
++
++def _extract_cuda_function(code: str, name: str) -> str:
++    marker = f"__global__ void {name}("
++    start = code.index(marker)
++    brace = code.index("{", start)
++    depth = 0
++    for pos in range(brace, len(code)):
++        if code[pos] == "{":
++            depth += 1
++        elif code[pos] == "}":
++            depth -= 1
++            if depth == 0:
++                return code[start : pos + 1]
++    raise ValueError(f"unterminated CUDA function: {name}")
++
++
++def _seeded_traversal_kernel_code(canonical_code: str) -> str:
++    """Derive seeded traversal code with one activation semantic change.
++
++    Expansion and next-level selection remain byte-identical to canonical v1.1.
++    Unique anchors make lineage drift fail closed.
++    """
++    signature_anchor = """    const int* scheduled_level,
++    int* frontier,"""
++    signature_replacement = """    const int* scheduled_level,
++    const int* is_seed,
++    int* frontier,"""
++    write_anchor = "        u[idx] = (float)current_level;"
++    write_replacement = """        if (!is_seed[idx]) {
++            u[idx] = (float)current_level;
++        }"""
++    if canonical_code.count(signature_anchor) != 1:
++        raise RuntimeError("canonical activation signature anchor is not unique")
++    if canonical_code.count(write_anchor) != 1:
++        raise RuntimeError("canonical activation write anchor is not unique")
++    seeded = canonical_code.replace(signature_anchor, signature_replacement)
++    seeded = seeded.replace(write_anchor, write_replacement)
++    for name in ("expand_frontier", "select_next_level"):
++        if _extract_cuda_function(seeded, name) != _extract_cuda_function(canonical_code, name):
++            raise RuntimeError(f"forbidden change to canonical kernel: {name}")
++    return seeded
++
++
++def _boundary_seed_host(cp, boundary_seeds, expected_shape: tuple[int, ...]):
++    seeds_dev = cp.ascontiguousarray(cp.asarray(boundary_seeds, dtype=cp.float32))
++    seeds = np.ascontiguousarray(cp.asnumpy(seeds_dev).reshape(seeds_dev.shape))
++    if seeds.shape != expected_shape or seeds.ndim != 3:
++        raise ValueError("boundary_seeds must have the same padded 3-D shape as U_lo/U_hi")
++    mask = ~np.isnan(seeds)
++    return seeds_dev, seeds, mask
++
++
++def _outer_padding_mask(shape: tuple[int, int, int]) -> np.ndarray:
++    outer = np.zeros(shape, dtype=bool)
++    outer[0, :, :] = outer[-1, :, :] = True
++    outer[:, 0, :] = outer[:, -1, :] = True
++    outer[:, :, 0] = outer[:, :, -1] = True
++    return outer
++
++
++def _validate_production_outer_seed_extension(seed_mask: np.ndarray) -> None:
++    """Fail closed outside the exact production right ghost-z extension.
++
++    The pre-existing P2-S2 domain permits arbitrary *interior* seed masks.
++    This extension broadens only the outer-padding part of that domain:
++
++    * x/y outer faces remain forbidden;
++    * the left z outer face (z=0) remains forbidden;
++    * if any outer seed exists, it must be the complete interior-x/y footprint
++      on the right ghost z face (z=-1);
++    * that ghost plane must be accompanied by the complete adjacent interior
++      z plane (z=-2), as produced by a nonempty right-overlap slab.
++
++    Source/Jacobi provenance is intentionally checked by the capture layer,
++    because it cannot be inferred from the three solver input arrays alone.
++    """
++    outer_seed = seed_mask & _outer_padding_mask(seed_mask.shape)
++    if not np.any(outer_seed):
++        return
++
++    if seed_mask.ndim != 3 or min(seed_mask.shape) < 3:
++        raise ValueError("production ghost-z extension requires a padded 3-D grid with interior cells")
++
++    allowed_outer = np.zeros(seed_mask.shape, dtype=bool)
++    allowed_outer[1:-1, 1:-1, -1] = True
++    if np.any(outer_seed & ~allowed_outer):
++        raise ValueError(
++            "outer seeds are permitted only on the production right ghost-z face; "
++            "x/y outer faces and left z padding remain forbidden"
++        )
++
++    if not np.all(seed_mask[1:-1, 1:-1, -1]):
++        raise ValueError("production right ghost-z seed must cover the full interior x-y footprint")
++    if not np.all(seed_mask[1:-1, 1:-1, -2]):
++        raise ValueError("production right ghost-z seed requires the adjacent right-overlap interior plane")
++
++
++def _validate_seeded_host(
++    seeds: np.ndarray,
++    seed_mask: np.ndarray,
++    lo: np.ndarray,
++    hi: np.ndarray,
++) -> tuple[int, int, np.ndarray]:
++    values = seeds[seed_mask]
++    if values.size == 0:
++        raise ValueError("seeded validation requires at least one non-NaN seed")
++    if not np.all(np.isfinite(values)):
++        raise ValueError("all non-NaN boundary seeds must be finite")
++    frac = float(np.max(np.abs(values.astype(np.float64) - np.rint(values.astype(np.float64)))))
++    if frac > 1e-7:
++        raise ValueError(
++            "P2-S2 paper path requires integer-valued boundary seeds; "
++            f"max fractional deviation={frac}"
++        )
++    if float(values.min()) < 0 or float(values.max()) > 255:
++        raise ValueError("P2-S2 paper path requires boundary seeds in [0,255]")
++    _validate_production_outer_seed_extension(seed_mask)
++    if not np.array_equal(values, lo[seed_mask]) or not np.array_equal(values, hi[seed_mask]):
++        raise ValueError("every paper-path seed must equal both pinned singleton endpoints")
++
++    # Use actual endpoint-derived bounds.  This is observationally equivalent
++    # to [0,255] in the frozen paper domain but preserves the legacy expression.
++    field_v_min = int(np.rint(float(lo.min())))
++    field_v_max = int(np.rint(float(hi.max())))
++    levels = np.full(lo.shape, -1, dtype=np.int32)
++    levels[seed_mask] = np.clip(
++        np.rint(values), field_v_min, field_v_max
++    ).astype(np.int32)
++    return field_v_min, field_v_max, levels
++
++
++def _kernel_bundle(cp, canonical_code: str):
++    traversal = cp.RawModule(
++        code=_seeded_traversal_kernel_code(canonical_code),
++        options=("-std=c++17",),
++    )
++    seed_module = cp.RawModule(code=_SEED_INIT_KERNEL_CODE, options=("-std=c++17",))
++    return {
++        "seed_init": seed_module.get_function("initialize_seeds"),
++        "activate": traversal.get_function("activate_level"),
++        "expand": traversal.get_function("expand_frontier"),
++        "select": traversal.get_function("select_next_level"),
++    }
++
++
++def _scalar_int(cp, value) -> int:
++    return int(cp.asnumpy(value).reshape(-1)[0])
++
++
++def seed_aware_boutry_bucket_gpu(
++    cp,
++    U_lo_pad,
++    U_hi_pad,
++    l_inf: float,
++    boundary_seeds=None,
++    tie_policy: str = "lower",
++    block_size: int = DEFAULT_BLOCK,
++    *,
++    canonical_module=None,
++    canonical_path: Path | None = None,
++):
++    """Run the P2-S2c prototype or delegate the exact unseeded path."""
++    canonical = canonical_module or load_canonical(canonical_path)
++    if boundary_seeds is None:
++        return canonical.boutry_bucket_gpu(
++            cp, U_lo_pad, U_hi_pad, l_inf,
++            tie_policy=tie_policy, block_size=block_size,
++        )
++
++    expected_shape = tuple(int(v) for v in U_lo_pad.shape)
++    seeds_dev, seeds_host, seed_mask = _boundary_seed_host(cp, boundary_seeds, expected_shape)
++    if not np.any(seed_mask):
++        return canonical.boutry_bucket_gpu(
++            cp, U_lo_pad, U_hi_pad, l_inf,
++            tie_policy=tie_policy, block_size=block_size,
++        )
++    if tie_policy not in ("lower", "higher"):
++        raise ValueError("tie_policy must be 'lower' or 'higher'")
++    if int(block_size) <= 0:
++        raise ValueError("block_size must be positive")
++
++    lo_dev = cp.ascontiguousarray(cp.asarray(U_lo_pad, dtype=cp.float32))
++    hi_dev = cp.ascontiguousarray(cp.asarray(U_hi_pad, dtype=cp.float32))
++    lo_host, hi_host, l0 = canonical._validate_host_intervals(
++        cp.asnumpy(lo_dev).reshape(lo_dev.shape),
++        cp.asnumpy(hi_dev).reshape(hi_dev.shape),
++        l_inf,
++    )
++    field_v_min, field_v_max, expected_seed_levels = _validate_seeded_host(
++        seeds_host, seed_mask, lo_host, hi_host
++    )
++    Wp, Hp, Dp = (int(v) for v in lo_host.shape)
++    N = Wp * Hp * Dp
++    lo_f = cp.ascontiguousarray(lo_dev.ravel(), dtype=cp.float32)
++    hi_f = cp.ascontiguousarray(hi_dev.ravel(), dtype=cp.float32)
++    seeds_f = cp.ascontiguousarray(seeds_dev.ravel(), dtype=cp.float32)
++
++    u = cp.full(N, cp.nan, dtype=cp.float32)
++    discovered = cp.zeros(N, dtype=cp.int32)
++    processed = cp.zeros(N, dtype=cp.int32)
++    scheduled_level = cp.full(N, -1, dtype=cp.int32)
++    is_seed = cp.zeros(N, dtype=cp.int32)
++    frontier = cp.zeros(N, dtype=cp.int32)
++    pending_count = cp.zeros(N_LEVELS, dtype=cp.int32)
++    pending_bits = cp.zeros((N_LEVELS + 31) // 32, dtype=cp.uint32)
++    activated_count = cp.zeros(1, dtype=cp.int32)
++    schedule_dir_count = cp.zeros(3, dtype=cp.int32)
++    next_level = cp.full(1, -1, dtype=cp.int32)
++    tie_event = cp.zeros(1, dtype=cp.int32)
++    has_next = cp.zeros(1, dtype=cp.int32)
++
++    discovered[0] = 1
++    scheduled_level[0] = l0
++    pending_count[l0] = 1
++    pending_bits[l0 >> 5] = cp.uint32(1 << (l0 & 31))
++
++    kernels = _kernel_bundle(cp, canonical._RAW_KERNEL_CODE)
++    block = int(block_size)
++    grid = (N + block - 1) // block
++    kernels["seed_init"](
++        (grid,), (block,),
++        (
++            seeds_f, u, discovered, scheduled_level, is_seed,
++            pending_count, pending_bits, field_v_min, field_v_max, N,
++        ),
++    )
++    cp.cuda.Stream.null.synchronize()
++
++    current = l0
++    level_transitions: list[list[int]] = []
++    closure_rounds_by_level: dict[str, int] = {}
++    total_activation_rounds = 0
++    backward_scheduler_transitions = 0
++    tie_events = 0
++    safety_limit = max(10000, N + 10 * N_LEVELS)
++
++    while True:
++        rounds = 0
++        while _scalar_int(cp, pending_count[current]) != 0:
++            rounds += 1
++            total_activation_rounds += 1
++            if total_activation_rounds > safety_limit:
++                raise RuntimeError(
++                    f"safety limit exceeded ({safety_limit}) while draining level {current}"
++                )
++            activated_count[0] = 0
++            kernels["activate"](
++                (grid,), (block,),
++                (
++                    u, discovered, processed, scheduled_level, is_seed, frontier,
++                    pending_count, pending_bits, activated_count, current, N,
++                ),
++            )
++            cp.cuda.Stream.null.synchronize()
++            activated = _scalar_int(cp, activated_count)
++            if activated <= 0:
++                remaining = _scalar_int(cp, pending_count[current])
++                raise RuntimeError(
++                    "pending-count invariant failed: "
++                    f"level {current} has {remaining} pending items but activated 0"
++                )
++            kernels["expand"](
++                (grid,), (block,),
++                (
++                    lo_f, hi_f, discovered, processed, scheduled_level, frontier,
++                    pending_count, pending_bits, schedule_dir_count,
++                    current, Wp, Hp, Dp,
++                ),
++            )
++            cp.cuda.Stream.null.synchronize()
++
++        closure_rounds_by_level[str(current)] = (
++            closure_rounds_by_level.get(str(current), 0) + rounds
++        )
++        next_level[0] = -1
++        tie_event[0] = 0
++        has_next[0] = 0
++        kernels["select"](
++            (1,), (1,),
++            (
++                pending_count, pending_bits, current,
++                1 if tie_policy == "higher" else 0,
++                next_level, tie_event, has_next,
++            ),
++        )
++        cp.cuda.Stream.null.synchronize()
++        if _scalar_int(cp, has_next) == 0:
++            break
++        nxt = _scalar_int(cp, next_level)
++        tie_events += int(bool(_scalar_int(cp, tie_event)))
++        backward_scheduler_transitions += int(nxt < current)
++        level_transitions.append([int(current), int(nxt)])
++        current = nxt
++
++    out = cp.asnumpy(u.reshape((Wp, Hp, Dp)))
++    discovered_np = cp.asnumpy(discovered).astype(bool).reshape((Wp, Hp, Dp))
++    processed_np = cp.asnumpy(processed).astype(bool).reshape((Wp, Hp, Dp))
++    scheduled_np = cp.asnumpy(scheduled_level).reshape((Wp, Hp, Dp))
++    is_seed_np = cp.asnumpy(is_seed).astype(bool).reshape((Wp, Hp, Dp))
++    pending_count_np = cp.asnumpy(pending_count)
++    pending_bits_np = cp.asnumpy(pending_bits)
++    dirs = cp.asnumpy(schedule_dir_count).astype(np.int64)
++
++    if int(pending_count_np.sum()) != 0 or bool(np.any(pending_bits_np)):
++        raise RuntimeError("worklist terminated with non-empty pending state")
++    if not np.array_equal(discovered_np, processed_np):
++        raise RuntimeError("worklist terminated with discovered != processed")
++    if not np.array_equal(is_seed_np, seed_mask):
++        raise RuntimeError("device seed mask differs from validated host seed mask")
++    if not np.array_equal(scheduled_np[seed_mask], expected_seed_levels[seed_mask]):
++        raise RuntimeError("device seed schedule differs from validated rint/clip schedule")
++    raw_preserved = np.array_equal(
++        out[seed_mask].view(np.uint32), seeds_host[seed_mask].view(np.uint32)
++    )
++    if not raw_preserved:
++        raise RuntimeError("raw seed bits were not preserved")
++
++    meta: dict[str, Any] = {
++        "implementation": "P2_S2C_SEED_AWARE_GPU_WORKLIST_PROTOTYPE",
++        "implementation_version": IMPLEMENTATION_VERSION,
++        "canonical_native_v1_1_sha256": CANONICAL_NATIVE_V1_1_SHA256,
++        "unseeded_delegated_to_canonical": False,
++        "bucket_count": N_LEVELS,
++        "field_V_MIN": field_v_min,
++        "field_V_MAX": field_v_max,
++        "l_inf_validated_integer": int(l0),
++        "tie_policy": tie_policy,
++        "seed_count": int(seed_mask.sum()),
++        "seed_activation_count": int(np.count_nonzero(processed_np & is_seed_np)),
++        "seed_raw_bits_preserved": bool(raw_preserved),
++        "nan_count": int(np.isnan(out).sum()),
++        "discovered_count": int(discovered_np.sum()),
++        "processed_count": int(processed_np.sum()),
++        "discovered_equals_processed": bool(np.array_equal(discovered_np, processed_np)),
++        "pending_total_final": int(pending_count_np.sum()),
++        "pending_bitset_nonzero_words_final": int(np.count_nonzero(pending_bits_np)),
++        "schedule_direction_counts": {
++            "backward": int(dirs[0]), "same": int(dirs[1]), "forward": int(dirs[2]),
++        },
++        "scheduler_transition_count": len(level_transitions),
++        "backward_scheduler_transition_count": int(backward_scheduler_transitions),
++        "equidistant_next_level_tie_events": int(tie_events),
++        "total_activation_rounds": int(total_activation_rounds),
++        "closure_rounds_by_level": closure_rounds_by_level,
++        "level_transitions": level_transitions,
++    }
++    aux = {
++        "discovered": discovered_np,
++        "processed": processed_np,
++        "scheduled_level": scheduled_np,
++        "seed_injection_level": expected_seed_levels,
++        "is_seed": is_seed_np,
++        "pending_count": pending_count_np,
++        "pending_bits": pending_bits_np,
++    }
++    return out, meta, aux
+diff --git a/test/test_smoke.py b/test/test_smoke.py
+index 9170290..dc5fae6 100644
+--- a/test/test_smoke.py
++++ b/test/test_smoke.py
+@@ -143,6 +143,41 @@ class TestParallelImmersion:
+         result = build_ispan(vol)
+         assert len(result) == 3, "build_ispan should return (U_lo, U_hi, l_inf)"
+ 
++    def test_sequential_fp_matches_coordinate_reference_on_anisotropic_grid(self):
++        """C-order flat neighbours must match the coordinate-based CPU FP."""
++        from src.ddfp.cpu_fp import build_ispan_cpu, fp_cpu
++        from src.ddfp.parallel_immersion import front_propagation
++
++        rng = np.random.default_rng(123)
++        vol = rng.integers(0, 256, size=(6, 7, 4), dtype=np.uint8)
++        lo, hi, l_inf = build_ispan_cpu(vol)
++        got = fp_cpu(lo, hi, l_inf)
++        ref = front_propagation(lo, hi, l_inf, verbose=False)
++        assert np.array_equal(got, ref)
++
++    def test_native_worklist_frozen_lineage_loads(self):
++        """The production adapter must resolve the exact P2 canonical source."""
++        from src.ddfp import gpu_seed_aware_worklist as seeded
++
++        canonical = seeded.load_canonical()
++        assert canonical.IMPLEMENTATION_VERSION == "1.1-audit-hardened"
++
++    def test_production_right_ghost_z_contract(self):
++        """Only the complete right ghost-z plane extension is admitted."""
++        from src.ddfp.gpu_seed_aware_worklist import (
++            _validate_production_outer_seed_extension,
++        )
++
++        valid = np.zeros((7, 9, 11), dtype=bool)
++        valid[1:-1, 1:-1, -1] = True
++        valid[1:-1, 1:-1, -2] = True
++        _validate_production_outer_seed_extension(valid)
++
++        invalid = valid.copy()
++        invalid[1, 1, 0] = True
++        with pytest.raises(ValueError, match="right ghost-z face"):
++            _validate_production_outer_seed_extension(invalid)
++
+     def test_build_ispan_output_shapes(self):
+         """U_lo, U_hi shape should be (2W+1, 2H+1, 2D+1) including padding."""
+         from src.ddfp.parallel_immersion import build_ispan
+@@ -881,4 +916,4 @@ class TestWalltimeFix:
+         # We do NOT assert vdwc["n_violations"] > 0 (depends on data),
+         # but we assert that bdry_viols is always 0 regardless.
+         # The test passes iff the boundary check is the authoritative signal.
+-        assert isinstance(vdwc["n_violations"], int)
+\ No newline at end of file
++        assert isinstance(vdwc["n_violations"], int)

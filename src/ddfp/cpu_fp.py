@@ -205,15 +205,17 @@ def fp_cpu(
 
     def nbs(idx: int) -> list[int]:
         """Return the list of 6-neighbor linear indices for linear index idx."""
-        z = idx // (Wp * Hp)
-        r = idx  % (Wp * Hp)
-        y = r // Wp
-        x = r  % Wp
+        # NumPy ravel() is C-order for shape (Wp, Hp, Dp):
+        # z is contiguous, then y, then x.
+        x = idx // (Hp * Dp)
+        r = idx % (Hp * Dp)
+        y = r // Dp
+        z = r % Dp
         res = []
         for i in range(6):
             nx, ny, nz = x + dx[i], y + dy[i], z + dz[i]
             if 0 <= nx < Wp and 0 <= ny < Hp and 0 <= nz < Dp:
-                res.append(nx + ny * Wp + nz * Wp * Hp)
+                res.append((nx * Hp + ny) * Dp + nz)
         return res
 
     # ── BFS propagation ──────────────────────────────────────────────────────

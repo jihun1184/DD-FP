@@ -1,0 +1,73 @@
+{
+ "baseline": {
+  "volumes": 400,
+  "adm_bad_runs": 0,
+  "KL": 0,
+  "F3": 0,
+  "P": 0,
+  "Q": 0,
+  "TB": 0,
+  "T1": 0,
+  "B_dwc": 0,
+  "vols_with_B_dwc_violation": 0,
+  "vols_with_T1_violation": 0
+ },
+ "M1_P3_violating_scheduler": {
+  "volumes": 400,
+  "adm_bad_runs": 398,
+  "KL": 22853,
+  "F3": 131682,
+  "P": 0,
+  "Q": 21091,
+  "TB": 16899,
+  "T1": 2284,
+  "B_dwc": 15638,
+  "vols_with_B_dwc_violation": 165,
+  "vols_with_T1_violation": 167
+ },
+ "M2_frame_alpha1_start1": {
+  "volumes": 400,
+  "adm_bad_runs": 0,
+  "KL": 0,
+  "F3": 0,
+  "P": 46348,
+  "Q": 180391,
+  "TB": 0,
+  "T1": 3386,
+  "B_dwc": 0,
+  "vols_with_B_dwc_violation": 0,
+  "vols_with_T1_violation": 255
+ },
+ "M3_halo_delta2": {
+  "volumes": 400,
+  "adm_bad_runs": 0,
+  "KL": 0,
+  "F3": 0,
+  "P": 0,
+  "Q": 0,
+  "TB": 0,
+  "T1": 32,
+  "B_dwc": 0,
+  "vols_with_B_dwc_violation": 0,
+  "vols_with_T1_violation": 23
+ },
+ "M4_descending_owner_at_seam": {
+  "volumes": 400,
+  "adm_bad_runs": 0,
+  "KL": 0,
+  "F3": 0,
+  "P": 0,
+  "Q": 0,
+  "TB": 0,
+  "T1": 177,
+  "B_dwc": 0,
+  "vols_with_B_dwc_violation": 0,
+  "vols_with_T1_violation": 17
+ },
+ "_meta": {
+  "mode": "mutants",
+  "N": 400,
+  "seed": 20261030,
+  "seconds": 129.4
+ }
+}

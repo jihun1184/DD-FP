@@ -1,0 +1,12 @@
+# Source files are stored with LF endings and must not be converted on checkout.
+# The frozen GPU kernel is verified by SHA-256 at import time (see docs/REPRODUCIBILITY.md);
+# a CRLF checkout (e.g. core.autocrlf=true on Windows) changes the hash and makes load_canonical() refuse to run.
+* text=auto eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+*.json text eol=lf
+*.diff -text
+src/ddfp/gpu_native_worklist.py -text
+# Evaluation material is stored byte-for-byte as received (hash manifests refer to these bytes).
+cmpb/** -text
+

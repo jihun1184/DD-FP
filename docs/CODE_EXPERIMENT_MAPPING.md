@@ -1,0 +1,60 @@
+# Code ↔ manuscript mapping
+
+Manuscript: *DD-FP: GPU Front Propagation with Slab Domain Decomposition for Digitally Well-Composed Interpolation of Biomedical Volumes* (V8 numbering). "Main" = main text, "S-x" = supplement section, "Fig./Tab." as in V8. Evidence identifiers V, E, S, F, G, M, O, C are those of the supplement provenance table (Table S-provenance).
+
+**Confidence of a mapping**
+
+- **A (recorded)**: the manuscript or an evaluation record names the script or its SHA-256, and the hash of the released file was recomputed here and matches.
+- **B (probable)**: the script's own docstring and I/O match the manuscript experiment, but no record in the release names it as the producer of the reported numbers. To be confirmed by the authors.
+- **C (not located)**: no script that produced the numbers is included in this release.
+
+**What was done in the release preparation** (no GPU available, no experiment run): hash recomputation (H), `compileall` and `pyflakes` (S), CPU-only tests and self-checks (T). Everything that needs CUDA was not executed (N). Numbers in this file are quoted from the manuscript and were not regenerated.
+
+## 1. Core implementation
+
+| Code | SHA-256 prefix | Role | Manuscript | Conf. | Checked |
+|---|---|---|---|---|---|
+| `src/ddfp/cpu_fp.py` (`build_ispan_cpu`, `fp_cpu`) | `8eae554f` | Sequential FP reference, single-threaded Python. Differs from the earlier public file (`3ce62b0d`) by the neighbour-index decoding in `nbs()` (see `cmpb/provenance/`; on non-cubic 3-D volumes the earlier file gives different, partly non-DWC output, see `LEGACY_NOTICE.md`) | Sec. 2.3 (FP definition); baseline of Sec. 5.2, Fig. 6a; Alg./definitions in S-B | A | H, S, T (CPU example in README) |
+| `src/ddfp/gpu_native_worklist.py` | `853bf33a` | Frozen CUDA worklist kernel (level-synchronous worklist, activation and expansion, tie rule `lower`) realizing P1–P5 | Sec. 3.1, Alg. 1; S-B (code-reading evidence for H-GPU); frozen-kernel baseline of Sec. 5.2/Fig. 6c | A | H, S; kernel N |
+| `src/ddfp/gpu_seed_aware_worklist.py` (`load_canonical`) | `c80f56b9` | Seed-aware wrapper; refuses to load a kernel whose hash differs | Sec. 3.3 (seeded rounds), S-D | A | H, S; N |
+| `src/ddfp/gpu_immersion.py` (`build_ispan_gpu`, `front_propagation_gpu`, `verify_dwc_gpu`) | `b784a376` | GPU interval map; GPU-FP K = 1 entry point (routes to the seed-aware native worklist); GPU whole-grid face + cube DWC check | Sec. 3.1 (GPU-FP, K = 1); Sec. 5.5, Tab. 3, S-F.3 (checker) | A | H, S; N |
+| `scripts/ddfp/experiment_DDFP_all.py` (`run_ibi_v10`) | `b6a9b109` | DD-FP: z-slab split, δ halo, window-local zero frame, ownership assembly. `max_rounds=0` = direct slab assembly; `max_rounds≥1` = optional IBI. Same bytes as `production_ibi.py` of the conformance harness | Sec. 3.2 (slabs, ownership), Sec. 3.3 (IBI); Sec. 5.3, 5.4 | A | H, S; N |
+| `src/utils/benchmark_utils.py` (`verify_dwc`) | – | Vectorised CPU DWC check (face and cube blocks) | Sec. 5.5 (CPU cross-check, small arrays) | B | T (executed on a 6³ example: 0 violations) |
+| `cmpb/evaluation/e_runtime_r7_runner/lib/r1_check53.py` | `3b4ce608` | Independent CPU checker that does not import the production code | S-C ("independent array verification"), Sec. 5.5 | A | H |
+
+## 2. Experiments of the manuscript
+
+| Manuscript item | Result (as stated in the manuscript) | Id | Code | Conf. | Notes |
+|---|---|---|---|---|---|
+| Sec. 5.2, Fig. 6a, S-F.7: GPU-FP vs sequential; runtime | 20/20 volumes identical (SHA-256); 111.927 s, 14.125 s, IBI final 14.511 s; 8.05× (bootstrap 7.62–8.51) | E (R7 stage E6) | `cmpb/evaluation/e_runtime_r7_runner/r7/r7_e6.py` (`340fc462`), `r7run.py`, `r7_common.py`, `lib/` | A | Run with `bash run7.sh e6`; needs the sealed checkout (see `docs/REPRODUCIBILITY.md`). Runs were not repeated here (N). |
+| Sec. 5.2: GPU counters agree with a CPU state machine, 40 volume–rule pairs | 40/40 | E (R7 stage E1) | `r7/r7_e1.py` (`7d641691`), `r7/r7_cpu_sm.py` | A | N |
+| Sec. 5.2, 5.5, Tab. 3, S-F.3: whole-grid verification | 20 volumes, K = 16, δ = 1, four arrays each; 282,015,220 blocks per array, 0 violations; direct assembly differs from sequential in 0.603–1.54 % of 70,897,269 cells | V | `e_runtime_r7_runner/r3_scripts/r3_global_check_timing.py` (`d1c90e9b`) with `lib/r1_check53.py`; diff tool `r3_scripts/r3_diff_ibi.py` | **B** | The manuscript does not name the script. The state of the kernel at the time of the saved arrays must be confirmed by the authors. The saved arrays are not in this release. |
+| Sec. 5.5, Tab. 3, S-F.4: seam-layer survey | 1,251 volumes × 8 configurations, IBI final; 0 seam-layer face blocks in 10,008 runs; xz/yz faces only; arrays not saved | F | – | **C** | Producer not located in the release tree. |
+| Sec. 5.2, Fig. 6c, S-I.1: GPU implementation comparison | medians 13.956 / 2.979 / 1.873 s (frozen / active frontier / active pile); ratios 4.604, 7.483, 1.629; identical output hash in 20/20 | G (G5 v2) | `cmpb/evaluation/g5_active_set/comparison/run_g5_v2.py` (`80fd213c`), `src/af_worklist.py` (`7b0a6529`), `comparison/generic_worklists_v2.py`, `tests/` | A (script), B (kernel files) | Mapping of the active-pile kernel to `generic_worklists_v2.py` to be confirmed by the authors. CPU shim self-test `comparison/test_g5_v2.py`: 53/53 (T, plumbing only, not evidence). |
+| Sec. 5.3, Fig. 6b, S-F.5, S-C.2: controlled slab benchmark | A/B/C runtime ratios for volumes 00158, 01363, 01628 at depth ×1, ×2, ×4 | S (S3, S3b) | `cmpb/evaluation/slab_memory_r8f1l/scripts/r8f1l_runner.py`, `r8f1l_worker.py`, `r8f1l_stats.py`, `r8f1l_gate.py`, `r8f1l_compare.py`; vendored R8-D/R8-C/F1J sources in `vendor/` | A | Frozen protocol chain F1K → R8F1L → S3b pre-registration. 15 of 16 CPU-stub tests pass; one needs result files not in this release (N for GPU stages). |
+| Sec. 5.3, Tab. 2, S-E, Fig. S5: memory | allocated peak of direct assembly 0.165–0.233 and of IBI final 0.717–0.742 of single pass at matched slab thickness (≈ 9.7 layers); 59 records; model vs. records 1.0000004–1.0000117 | M (R8C, S3, S3b) | `cmpb/evaluation/memory_r8c/scripts/` (`r8c_scaling_runner.py`, `r8c_gpu_memory_probe.py`, `r8c_memory_model.py`, `r8c_validate.py`), `r8f1l` as above; table from `cmpb/manuscript_tools/make_tables.py` | A | The memory model is static accounting; the output arrays of these runs were not archived. |
+| Sec. 5.4, S-D: IBI | no advantage on any measured quantity; concentration criterion not met | S (H3/H4 of the frozen protocol) | `slab_memory_r8f1l/scripts/r8f1l_stats.py`, `r8f1l_compare.py` | A | |
+| Sec. 5.6, Tab. 4, S-H: comparison with Min/Max | exhaustive small volumes, 222 phantoms, 77 crops; FP vs Min vs Max | O (E1 record, pre-registration `e52de230…`) | – | **C** | The C model of the frozen kernel used for this record is not in the release; raw rows were not archived (manuscript states this). |
+| Sec. 5.7, Figs. 7–9, S-C.1, S-G: biomedical topology | DRIVE 9,544 critical blocks without interpolation, none for sequential FP and DD-FP; BraTS χ flips 26.78 % (335/1,251); CREMI 2D/3D | C | `scripts/part_b/exp_b1_topology_accuracy.py` (`888633e4`), `exp_b2_cc_analysis.py`, `exp_b3_brats_3d_all.py`, `exp_b4_cremi_3d.py`; `src/preprocessing/preprocessor.py`; `data/CREMI/prepare_cremi.py` | B | Values come from the earlier evaluation of the production IBI-final configuration; not re-run for the present manuscript. The kernel state at the time of that run must be confirmed. `tools/verify_r23_numbers.py` named in S-C.1 is not in the release. |
+| Sec. 4, Thm. SA; S-A, S-A.7: proof and numerical consistency tests | consistency tests of the proof steps (e.g. 2,500 volumes / 8,198 windows in the span runs) | – | `cmpb/theorem_tests/r0_verify.py`, `r0_aux.py`, `r0lib.py`, logs and result JSON | A | Independent of the production code. They test steps of the proof and do not establish CUDA conformance (H-GPU) or replace formal verification. |
+| Sec. 3.1, 5.2, S-B: P1–P5 conformance (CPU model, tie rules) | CPU model: identical outputs for different orders inside a level in 4,500/4,500; `lower` vs `higher` differ in 575/1,500 arbitrary fields | MODEL | `cmpb/evaluation/conformance_r8f1j/` (Round-0 conformance harness, oracle, CPU references) | B | Which script produced the 4,500-input model counts is not named in the manuscript. |
+| S-B: GPU parity fixtures | 50 fixtures × 2 tie rules | – | `cmpb/evaluation/e_runtime_r7_runner/e2/gpu_parity/` | B | CPU self-check: 100/100 runs, digest matches reference (T). The GPU run itself is N. |
+
+## 3. Figure and table scripts
+
+| Script (`cmpb/manuscript_tools/`) | Produces | Inputs | Runnable from this release? |
+|---|---|---|---|
+| `make_tables.py` | memory tables (`mem_main_table.tex`, `mem_full_table.tex`) | `data/p2_memory_recompute.json` | No: the stored records are not part of the release. |
+| `make_figs.py` | Fig. 6 (runtime), memory figure | `data/timing_E6_vs_P6.json`, `tierS_time_ratios_from_frozen_cli.csv`, `rows.jsonl`, `p2_memory_recompute.json` | No (same reason). |
+| `make_fig_dwc_mechanism.py`, `make_fig_qualitative.py`, `make_fig_frontier_main.py`, `make_fig_p4_*.py` | mechanism, qualitative, frontier figures | stored arrays and records | No. |
+| `build.py`, `assemble.sh`, `check_final.py`, `make_xref.py`, `*_preservation_check.py` | manuscript build and consistency checks | the manuscript package | Not applicable to the code release. |
+
+The TikZ sources of the schematic figures and tables (`figsrc/`) belong to the manuscript package and are not part of this repository.
+
+## 4. Items for author confirmation
+
+1. Producer of tier V (whole-grid verification) and tier F (seam-layer survey), and the kernel version used when those arrays were produced.
+2. Producer of the Min/Max operator comparison (tier O); whether the C model may be released.
+3. State of the code used for tier C, in particular which `cpu_fp.py` (earlier public file `3ce62b0d` or evaluated file `8eae554f`) produced the sequential-FP arm of non-cubic 3-D results, and `tools/verify_r23_numbers.py`.
+4. Mapping of the active-pile kernel (tier G) to `generic_worklists_v2.py`.
+5. Whether the stored records (per-volume rows, timing and memory records) are to be released together with the code. The manuscript currently states that they are held by the authors.

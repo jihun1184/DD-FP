@@ -143,6 +143,41 @@ class TestParallelImmersion:
         result = build_ispan(vol)
         assert len(result) == 3, "build_ispan should return (U_lo, U_hi, l_inf)"
 
+    def test_sequential_fp_matches_coordinate_reference_on_anisotropic_grid(self):
+        """C-order flat neighbours must match the coordinate-based CPU FP."""
+        from src.ddfp.cpu_fp import build_ispan_cpu, fp_cpu
+        from src.ddfp.parallel_immersion import front_propagation
+
+        rng = np.random.default_rng(123)
+        vol = rng.integers(0, 256, size=(6, 7, 4), dtype=np.uint8)
+        lo, hi, l_inf = build_ispan_cpu(vol)
+        got = fp_cpu(lo, hi, l_inf)
+        ref = front_propagation(lo, hi, l_inf, verbose=False)
+        assert np.array_equal(got, ref)
+
+    def test_native_worklist_frozen_lineage_loads(self):
+        """The production adapter must resolve the exact P2 canonical source."""
+        from src.ddfp import gpu_seed_aware_worklist as seeded
+
+        canonical = seeded.load_canonical()
+        assert canonical.IMPLEMENTATION_VERSION == "1.1-audit-hardened"
+
+    def test_production_right_ghost_z_contract(self):
+        """Only the complete right ghost-z plane extension is admitted."""
+        from src.ddfp.gpu_seed_aware_worklist import (
+            _validate_production_outer_seed_extension,
+        )
+
+        valid = np.zeros((7, 9, 11), dtype=bool)
+        valid[1:-1, 1:-1, -1] = True
+        valid[1:-1, 1:-1, -2] = True
+        _validate_production_outer_seed_extension(valid)
+
+        invalid = valid.copy()
+        invalid[1, 1, 0] = True
+        with pytest.raises(ValueError, match="right ghost-z face"):
+            _validate_production_outer_seed_extension(invalid)
+
     def test_build_ispan_output_shapes(self):
         """U_lo, U_hi shape should be (2W+1, 2H+1, 2D+1) including padding."""
         from src.ddfp.parallel_immersion import build_ispan

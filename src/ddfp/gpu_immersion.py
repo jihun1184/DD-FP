@@ -248,10 +248,12 @@ __global__ void fp_bfs_step(
     if (idx >= N) return;
     if (!frontier[idx]) return;
 
-    int z = idx / (Wp * Hp);
-    int r = idx % (Wp * Hp);
-    int y = r / Wp;
-    int x = r % Wp;
+    // CuPy ravel() is C-order for shape (Wp, Hp, Dp):
+    // z is contiguous, then y, then x.
+    int x = idx / (Hp * Dp);
+    int r = idx % (Hp * Dp);
+    int y = r / Dp;
+    int z = r % Dp;
 
     const int dx[6] = {-1, 1,  0, 0,  0, 0};
     const int dy[6] = { 0, 0, -1, 1,  0, 0};
@@ -264,7 +266,7 @@ __global__ void fp_bfs_step(
         if (nx < 0 || nx >= Wp || ny < 0 || ny >= Hp || nz < 0 || nz >= Dp)
             continue;
 
-        int nidx = nx + ny * Wp + nz * Wp * Hp;
+        int nidx = (nx * Hp + ny) * Dp + nz;
         if (visited[nidx]) continue;
 
         float lo  = U_lo[nidx];
@@ -334,10 +336,12 @@ __global__ void fp_activate_level(
     if (idx >= N) return;
     if (visited[idx]) return;
 
-    int z = idx / (Wp * Hp);
-    int r = idx % (Wp * Hp);
-    int y = r / Wp;
-    int x = r % Wp;
+    // CuPy ravel() is C-order for shape (Wp, Hp, Dp):
+    // z is contiguous, then y, then x.
+    int x = idx / (Hp * Dp);
+    int r = idx % (Hp * Dp);
+    int y = r / Dp;
+    int z = r % Dp;
 
     const int dx[6] = {-1, 1,  0, 0,  0, 0};
     const int dy[6] = { 0, 0, -1, 1,  0, 0};
@@ -350,7 +354,7 @@ __global__ void fp_activate_level(
         int nx = x + dx[d], ny = y + dy[d], nz = z + dz[d];
         if (nx < 0 || nx >= Wp || ny < 0 || ny >= Hp || nz < 0 || nz >= Dp)
             continue;
-        if (visited[nx + ny*Wp + nz*Wp*Hp]) { has_visited_nb = true; break; }
+        if (visited[(nx * Hp + ny) * Dp + nz]) { has_visited_nb = true; break; }
     }
     if (!has_visited_nb) return;
 
@@ -391,7 +395,7 @@ def _get_fp_kernels():
     return _k_bfs, _k_activate
 
 
-def front_propagation_gpu(
+def _front_propagation_gpu_legacy(
     U_lo_pad: cp.ndarray,
     U_hi_pad: cp.ndarray,
     l_inf: float,
@@ -565,6 +569,45 @@ def front_propagation_gpu(
     return u_dwc_f.reshape(Wp, Hp, Dp)
 
 
+def front_propagation_gpu(
+    U_lo_pad: cp.ndarray,
+    U_hi_pad: cp.ndarray,
+    l_inf: float,
+    boundary_seeds: cp.ndarray = None,
+    verbose: bool = True,
+) -> cp.ndarray:
+    """Run the validated GPU-native hierarchical worklist.
+
+    This preserves the historical public API while routing both unseeded and
+    IBI boundary-seeded calls through the P2-validated native scheduler.  The
+    lower tie policy matches the frozen production choice.  Seeded calls are
+    validated fail-closed, including the production right ghost-z extension.
+    """
+    from .gpu_seed_aware_worklist import seed_aware_boutry_bucket_gpu
+
+    t0 = time.time()
+    out, meta, _ = seed_aware_boutry_bucket_gpu(
+        cp,
+        U_lo_pad,
+        U_hi_pad,
+        l_inf,
+        boundary_seeds=boundary_seeds,
+        tie_policy="lower",
+    )
+    if meta["nan_count"] != 0:
+        raise RuntimeError(
+            f"validated native worklist returned {meta['nan_count']} NaN cells"
+        )
+    if verbose:
+        print(
+            "  [FP-GPU native-worklist] "
+            f"processed={meta['processed_count']:,}/{out.size:,} "
+            f"seeds={meta.get('seed_count', 0):,} "
+            f"({time.time()-t0:.2f}s)"
+        )
+    return cp.asarray(out, dtype=cp.float32)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # §B-ext  NaN fallback + DWC verification CUDA kernels
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -601,7 +644,8 @@ extern "C" {
  * -----------------------------------------------------------------------------
  */
 __global__ void nan_fill_closest_snap(
-    float*       u_dwc,
+    const float* u_prev,       // read-only snapshot for this launch
+    float*       u_next,       // write-only output buffer for this launch
     const float* U_lo,
     const float* U_hi,
     int*         changed,
@@ -609,12 +653,14 @@ __global__ void nan_fill_closest_snap(
 ) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= Wp * Hp * Dp) return;
-    if (!isnan(u_dwc[idx]))  return;   // skip already-confirmed pixels
+    if (!isnan(u_prev[idx])) { u_next[idx] = u_prev[idx]; return; }  // already-confirmed: carry through
 
-    int z = idx / (Wp * Hp);
-    int r = idx % (Wp * Hp);
-    int y = r / Wp;
-    int x = r % Wp;
+    // CuPy ravel() is C-order for shape (Wp, Hp, Dp):
+    // z is contiguous, then y, then x.
+    int x = idx / (Hp * Dp);
+    int r = idx % (Hp * Dp);
+    int y = r / Dp;
+    int z = r % Dp;
 
     const int dx[6] = {-1, 1,  0, 0,  0, 0};
     const int dy[6] = { 0, 0, -1, 1,  0, 0};
@@ -630,7 +676,11 @@ __global__ void nan_fill_closest_snap(
         int nx = x + dx[d], ny = y + dy[d], nz = z + dz[d];
         if (nx < 0 || nx >= Wp || ny < 0 || ny >= Hp || nz < 0 || nz >= Dp)
             continue;
-        float nb = u_dwc[nx + ny*Wp + nz*Wp*Hp];
+        // Double-buffer fix: read only u_prev, a fixed snapshot for this
+        // launch. Another thread's fill result written to u_next this same
+        // launch must never be visible here -- that intra-launch
+        // read-after-write dependency was the original nondeterminism.
+        float nb = u_prev[(nx * Hp + ny) * Dp + nz];
         if (isnan(nb)) continue;
 
         // Algorithm 1 priority_push: snap(l_nb, U(p))
@@ -644,8 +694,10 @@ __global__ void nan_fill_closest_snap(
     }
 
     if (!isnan(best_snap)) {
-        u_dwc[idx] = best_snap;
+        u_next[idx] = best_snap;
         atomicAdd(changed, 1);
+    } else {
+        u_next[idx] = u_prev[idx];   // still NaN: carry forward unchanged
     }
 }
 
@@ -703,7 +755,7 @@ __global__ void dwc_check_all_blocks(
 
     auto V = [&](int a, int b, int c) -> float {
         if (a<0||a>=Wp||b<0||b>=Hp||c<0||c>=Dp) return nanf("");
-        return u[a + b*Wp + c*Wp*Hp];
+        return u[(a * Hp + b) * Dp + c];
     };
 
     if (idx < N2d) {
@@ -817,10 +869,10 @@ __global__ void dwc_collect_violation_pixels(
 
     auto V = [&](int a, int b, int c) -> float {
         if (a<0||a>=Wp||b<0||b>=Hp||c<0||c>=Dp) return nanf("");
-        return u[a + b*Wp + c*Wp*Hp];
+        return u[(a * Hp + b) * Dp + c];
     };
     auto FI = [&](int a, int b, int c) -> int {
-        return a + b*Wp + c*Wp*Hp;
+        return (a * Hp + b) * Dp + c;
     };
 
     if (idx < N2d) {
@@ -927,6 +979,15 @@ def _fill_nan_neighbor_snap(
     max_iter default is set to the grid diameter (Wp+Hp+Dp).
     BraTS: ~1273, synthetic 32^3: ~190, CT (512^2×400): ~1424.
     Set large enough to ensure full convergence without forced U_lo assignment.
+
+    STEP 1H-2R REPAIR: double-buffered (Jacobi-style) wavefront. Each
+    iteration's kernel launch reads only the previous iteration's fixed
+    snapshot (u_prev) and writes exclusively to a separate buffer (u_next),
+    then the two are swapped. This removes the intra-launch
+    read-after-write dependency on GPU thread-scheduling order that made
+    the original in-place kernel's output nondeterministic (Step 1H-2A:
+    FIRST_DIVERGENCE_LOCALIZED_TO_NAN_FALLBACK, subdomains 2-12,
+    BraTS2021_00150, index_only).
     """
     k_nan, _ = _get_nan_kernels()
     N = Wp * Hp * Dp
@@ -934,19 +995,23 @@ def _fill_nan_neighbor_snap(
     grid  = (N + block - 1) // block
     changed = cp.zeros(1, dtype=cp.int32)
 
+    u_prev = u_dwc_f
+    u_next = cp.empty_like(u_prev)
+
     for it in range(max_iter):
         changed[0] = 0
         k_nan((grid,), (block,),
-              (u_dwc_f, U_lo_f, U_hi_f, changed, Wp, Hp, Dp))
+              (u_prev, u_next, U_lo_f, U_hi_f, changed, Wp, Hp, Dp))
         cp.cuda.Stream.null.synchronize()
         n_filled = int(changed[0].item())
+        u_prev, u_next = u_next, u_prev
         if n_filled == 0:
             break
         if verbose:
-            nan_left = int(cp.isnan(u_dwc_f).sum().item())
+            nan_left = int(cp.isnan(u_prev).sum().item())
             print(f"    [NaN-fill] iter={it+1:2d}  filled={n_filled:,}  remaining={nan_left:,}")
 
-    return u_dwc_f
+    return u_prev
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

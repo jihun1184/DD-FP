@@ -1,0 +1,78 @@
+{
+ "shape": [
+  {
+   "shape": [
+    2,
+    2,
+    2
+   ],
+   "values": 3,
+   "volumes": 3000,
+   "K": [
+    1,
+    2
+   ]
+  },
+  {
+   "shape": [
+    2,
+    2,
+    3
+   ],
+   "values": 3,
+   "volumes": 3000,
+   "K": [
+    1,
+    2,
+    3
+   ]
+  },
+  {
+   "shape": [
+    1,
+    2,
+    4
+   ],
+   "values": 3,
+   "volumes": 3000,
+   "K": [
+    2,
+    3,
+    4
+   ]
+  },
+  {
+   "shape": [
+    3,
+    2,
+    2
+   ],
+   "values": 3,
+   "volumes": 3000,
+   "K": [
+    2
+   ]
+  }
+ ],
+ "volumes": 12000,
+ "window_decision_sequences": 60000,
+ "distinct_window_outputs": 60000,
+ "assemblies": 27000,
+ "B_dwc_violations": 0,
+ "T1_violations": 0,
+ "voxel_eq": 0,
+ "lemma_violations": 0,
+ "max_branches": 0,
+ "complete_enumeration": [
+  false,
+  false,
+  false,
+  false
+ ],
+ "_meta": {
+  "mode": "exhaustive",
+  "N": 3000,
+  "seed": 20261031,
+  "seconds": 60.1
+ }
+}
