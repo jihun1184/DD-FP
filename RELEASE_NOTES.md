@@ -1,35 +1,40 @@
-# Release notes: CMPB release candidate
+# DD-FP v1.0.0 — CMPB Submission Code
 
-Branch `cmpb-release-candidate`; base `8fdfe62` (tag `pr-2026-legacy`). No release tag, no DOI. Corresponds to manuscript V9 (Phase 3B final text).
+Formal software release for manuscript V9 (Phase 3B), dated 2026-10-28.
+Target: the verified documentation-finalized `main` commit identified by tag
+[`v1.0.0`](https://github.com/jihun1184/DD-FP/releases/tag/v1.0.0).
+The earlier Pattern Recognition code remains at `pr-2026-legacy`
+(`8fdfe6233dfe53f996ed2f09e8810bca53d5323b`). No DOI is claimed.
 
-## What changed relative to `8fdfe62`
+## Included code and changes relative to the legacy version
 
-**Replaced (source tree = the tree used for the evaluation)**
-- `src/ddfp/cpu_fp.py`: C-order neighbour decoding (`3ce62b0d` → `8eae554f`). On non-cubic 3-D volumes the earlier file gives different output; see `docs/CPU_FP_PROVENANCE.md`.
-- `src/ddfp/gpu_immersion.py` (`fffd21b5` → `b784a376`: routes GPU-FP to the seed-aware native worklist) and `test/test_smoke.py` (`6c2fc0b0` → `d1dea404`).
-- Unchanged from `8fdfe62`: `scripts/ddfp/experiment_DDFP_all.py` (`b6a9b109`, the evaluated DD-FP driver; with the earlier `gpu_immersion.py` it ran the earlier Level-BFS kernel, with the evaluated one it runs the worklist kernel).
-- `README.md`: rewritten for V9; earlier performance and theory claims removed (unconditional DWC, ≈ 11× algorithmic speed-up, general R\* ≤ 2 for IBI, uniquely optimal δ = 1, TSI as evidence of topology preservation).
+- Sequential CPU FP: corrected C-order neighbour decoding for non-cubic 3-D volumes in `src/ddfp/cpu_fp.py` (`3ce62b0d…` to `8eae554f…`). See `docs/CPU_FP_PROVENANCE.md` for the limited scope and per-result provenance; this does not establish the provenance of every earlier aggregate.
+- GPU-FP: public level-synchronous worklist kernel `src/ddfp/gpu_native_worklist.py` (SHA-256 `853bf33a6bbd9c91f5304a018f0a51ff53e8418360fe1477208cf81df17163ac`), seed-aware wrapper and evaluated routing in `gpu_immersion.py`.
+- DD-FP: `scripts/ddfp/experiment_DDFP_all.py` (`run_ibi_v10`), z-slab direct assembly (`max_rounds=0`) and optional seeded IBI rounds. The driver bytes are unchanged from legacy; the evaluated GPU routing differs.
+- DWC verification: GPU whole-grid checker, CPU checker and independent checker in `cmpb/evaluation/e_runtime_r7_runner/lib/r1_check53.py`.
+- Evaluation and reproducibility: runtime, memory, controlled slab, GPU implementation and topology scripts in `cmpb/evaluation/`; existing numerical proof-step tests in `cmpb/theorem_tests/`; stored-record table/figure scripts in `cmpb/manuscript_tools/`; small records in `cmpb/data/`; mapping, provenance and per-figure/table reproducibility documents in `docs/`.
+- Removed legacy parameter-sweep scripts remain recoverable from Git history and `pr-2026-legacy`. Hash-locked legacy comments are documented in `docs/LEGACY_NOTICE.md`.
 
-**Added**
-- GPU-FP worklist kernel and wrapper: `src/ddfp/gpu_native_worklist.py` (`853bf33a`, frozen), `gpu_seed_aware_worklist.py` (`c80f56b9`).
-- `cmpb/`: evaluation packages (runtime and parity, conformance, memory, controlled slab benchmark, GPU comparison, topology producers), proof-step tests, table/figure scripts, small stored records (`cmpb/data/`), provenance (patch, CPU-FP comparison and extraction).
-- `docs/`: `CODE_EXPERIMENT_MAPPING.md`, `REPRODUCIBILITY.md`, `FIGURE_TABLE_REPRODUCIBILITY.md`, `CPU_FP_PROVENANCE.md`, `CODE_AVAILABILITY.md`, `LEGACY_NOTICE.md`.
-- `CITATION.cff`, `RELEASE_NOTES.md`, `SHA256SUMS.txt`, `cmpb/FILE_SHA256SUMS.txt`, `.gitattributes`.
+## Finalization checks actually executed (2026-10-28)
 
-**Removed from the tree** (recoverable from history and from the tag `pr-2026-legacy`)
-- `scripts/analysis/analyse_epsilon.py`, `run_epsilon_sensitivity.py`, `tips.py`.
+On Windows, Python 3.12.14, installed `requirements.txt` plus test tools in an isolated environment:
 
-**Kept although legacy**: `scripts/part_a/` and `scripts/part_b/verify_wilcoxon.py` (loaded by the hash-locked smoke tests), `src/ddfp/parallel_immersion.py` and the other earlier modules; their legacy wording is listed in `docs/LEGACY_NOTICE.md`.
+- Remote `main` and `cmpb-release-candidate` initially both `44422b357df86790cca98d2d7bd9a869f95bcc47`; legacy tag peeled to the expected legacy commit. Existing local tracked files matched the public tree.
+- Baseline root SHA-256 manifest: 261 entries, zero mismatches. CMPB manifest: 223 entries, zero mismatches. Six evaluated hash-checked files matched `r7_common.EXPECTED`; all evaluated sources and stored records remain unchanged.
+- `python -m pytest test/test_smoke.py -q`: **65 passed, 12 skipped** (CUDA tests). Initial two failures were temporary-directory permission errors; rerun with a workspace-local temporary directory passed without source changes.
+- README CPU example: output shape `(11, 11, 11)`, zero violations.
+- `python -m compileall -q src scripts test cmpb data`: passed.
+- `pyflakes` 4.0.3: 150 diagnostics on unchanged sources (the earlier preparation recorded 149 with its tool version); includes the previously documented undefined `NoReturn` in a quoted return annotation. Static checking is not reported as warning-free; frozen files were not edited.
+- Tracked-file hygiene scan: no credential-pattern hits and no medical-image files; the four `.npy` files are one-dimensional exploratory workload/time records, not image volumes. This is a bounded scan, not a universal privacy guarantee.
 
-**`.gitignore`**: dataset locations are ignored at the repository root only; `cmpb/data/` and result JSON/CSV files inside `cmpb/` are tracked.
+Earlier release-preparation checks (Python 3.13 on Linux) are recorded separately in `docs/REPRODUCIBILITY.md`; their reported CPU self-check counts are not new executions in this finalization. No new scientific experiment, proof, CUDA execution or GPU benchmark was performed.
 
-## Checks made for this candidate (no GPU, no new experiment)
-See `docs/REPRODUCIBILITY.md` §1: hash recomputation, smoke tests, compile and static checks, clean-clone and CRLF check, table/figure recomputation from `cmpb/data/`, hygiene scan.
+## Reproducible scope and limitations
 
-## Not claimed
-- Execution of any CUDA path in the preparation of this candidate.
-- Reproduction of the GPU measurements, the whole-grid and seam-layer verification, the Min/Max comparison, the BraTS/CREMI topology pipelines or the qualitative arrays (inputs or producers not in the repository; `docs/FIGURE_TABLE_REPRODUCIBILITY.md`).
-- That the CUDA code realizes P1–P5 (H-GPU is not proved) or that Theorem SA is machine-verified.
+Stored records support recomputing DRIVE/CREMI-2D aggregates, timing and memory tables and selected plotted quantities. This recomputes summaries, not the underlying GPU measurements. The per-figure/table status is in `docs/FIGURE_TABLE_REPRODUCIBILITY.md`, and experiment-to-code confidence is in `docs/CODE_EXPERIMENT_MAPPING.md`.
 
-## Requires the author's approval (not done)
-Push of the branch, merge into `main`, release tag, GitHub release, archive and DOI.
+BraTS 2021, DRIVE and CREMI datasets are not redistributed. Whole-grid output arrays, qualitative source arrays/rasters, per-subject BraTS 3-D topology data, raw Min/Max comparison rows and complete seam-survey records are not included. Some producers and code-to-record mappings remain unconfirmed. Availability on request is not promised for unarchived or unlocated material.
+
+Theorem SA is conditional on the stated unseeded direct-assembly assumptions; IBI is outside it. H-GPU is not proved; finite zero-violation observations are not a general guarantee. GPU-FP identity was observed on the tested volumes; DD-FP is a different operator. Timing is from one RTX 4090 against an unoptimized single-thread Python reference, and memory results retain their effective-sample-size and full-volume-array limitations. IBI showed no advantage on the measured quantities. No clinical, downstream or topology-preservation benefit is claimed.
+
+These are software-release and evidence-scope notes. Development history is not evidence of scientific novelty or theorem validity. The accompanying manuscript is unpublished. MIT applies to the code; datasets retain their own terms.

@@ -4,9 +4,9 @@
 
 Code accompanying the manuscript
 
-> J. Bae, H. Lee, Y. Bae, H. Choe, J. Hu. *DD-FP: GPU Front Propagation with Slab Domain Decomposition for Digitally Well-Composed Interpolation of Biomedical Volumes.* Manuscript submitted to *Computer Methods and Programs in Biomedicine* (citation to be added after publication; see [`CITATION.cff`](CITATION.cff)).
+> J. Bae, H. Lee, Y. Bae, H. Choe, J. Hu. *DD-FP: GPU Front Propagation with Slab Domain Decomposition for Digitally Well-Composed Interpolation of Biomedical Volumes.* Unpublished manuscript prepared for submission to *Computer Methods and Programs in Biomedicine* (citation to be added after publication; see [`CITATION.cff`](CITATION.cff)).
 
-> **Status: release candidate** (branch `cmpb-release-candidate`; no tag, no DOI). The code state of the earlier submission era is preserved at commit `8fdfe62` and tag `pr-2026-legacy`. The manuscript and its supplement take precedence over this file.
+> **CMPB submission code: v1.0.0.** The CMPB code is included in public `main`. The formal software release is [`v1.0.0`](https://github.com/jihun1184/DD-FP/releases/tag/v1.0.0); its tag identifies the exact release commit. The earlier Pattern Recognition submission code is preserved under `pr-2026-legacy` at `8fdfe6233dfe53f996ed2f09e8810bca53d5323b`. No software DOI has been issued or is claimed. The manuscript and its supplement take precedence over this file.
 
 ## 1. Purpose and contribution
 
@@ -53,7 +53,7 @@ The datasets are public and are **not** redistributed. `data/` is git-ignored.
 ## 5. Installation and environment
 
 ```bash
-git clone https://github.com/jihun1184/DD-FP.git && cd DD-FP && git checkout cmpb-release-candidate
+git clone https://github.com/jihun1184/DD-FP.git && cd DD-FP && git checkout v1.0.0
 python -m pip install -r requirements.txt
 python -m pip install cupy-cudaXXx      # GPU only; build matching your CUDA toolkit
 ```
@@ -64,7 +64,7 @@ Reported measurements: NVIDIA RTX 4090 (24,564 MiB), driver 595.99.02, CUDA 13.2
 
 ## 6. Minimal commands
 
-CPU only (executed in the release preparation, Python 3.13, no GPU):
+CPU only (rechecked during finalization on Windows, Python 3.12.14, no CUDA execution):
 
 ```python
 import numpy as np
@@ -117,15 +117,15 @@ cmpb/data/          small stored records used by the table/figure scripts
 cmpb/provenance/       patch 8fdfe62 → evaluated tree, CPU-FP version comparison, provenance extraction
 cmpb/provenance_R23/   earlier numerical-verification scripts (archival; tied to an earlier manuscript version)
 docs/                  mapping, reproducibility, code availability, legacy notice, figure/table map
-SHA256SUMS.txt         SHA-256 of every file of this branch
+SHA256SUMS.txt         SHA-256 of tracked release files (excluding this manifest itself)
 ```
 
 ## 9. Relationship to earlier versions
 
-- `main` is unchanged (commit `8fdfe62`, "Update test") and tag `pr-2026-legacy` marks it. This branch contains that state plus the source tree used for the evaluation (`cmpb/provenance/PATCH_8fdfe62_to_evaluated_tree.diff`) and the evaluation material; it descends from `main` and can be merged fast-forward.
-- **Sequential reference.** `cpu_fp.py` of `8fdfe62` decoded neighbour indices in an order that does not match the C-order layout of the array. On small random non-cubic 3-D volumes its output differed from the evaluated version and, in 12 of 30 cases, contained DWC violations; cubic and depth-1 (2-D) volumes were identical. Use the version on this branch. See [`docs/CPU_FP_PROVENANCE.md`](docs/CPU_FP_PROVENANCE.md) for which reported results used which version.
+- `main` contains the CMPB source tree used for the evaluation (`cmpb/provenance/PATCH_8fdfe62_to_evaluated_tree.diff`) and the evaluation material. The earlier Pattern Recognition code is recoverable from the annotated tag `pr-2026-legacy` (commit `8fdfe6233dfe53f996ed2f09e8810bca53d5323b`). The v1.0.0 release preserves the evaluated source and stored records unchanged; finalization changes documentation and citation metadata only.
+- **Sequential reference.** `cpu_fp.py` of `8fdfe62` decoded neighbour indices in an order that does not match the C-order layout of the array. On small random non-cubic 3-D volumes its output differed from the evaluated version and, in 12 of 30 cases, contained DWC violations; cubic and depth-1 (2-D) volumes were identical. Use the version in v1.0.0 or current `main`. See [`docs/CPU_FP_PROVENANCE.md`](docs/CPU_FP_PROVENANCE.md) for which reported results used which version.
 - Removed from the earlier README: an unconditional DWC guarantee, δ = 1 being uniquely optimal, a general R\* ≤ 2 bound for IBI, a ≈ 11× algorithmic speed-up, TSI as evidence of topological stability, and the earlier review status. The earlier parameter-sweep scripts (`scripts/analysis/`) were removed from this tree and remain in the Git history and under the tag. Remaining legacy wording in hash-locked or archival files is listed in [`docs/LEGACY_NOTICE.md`](docs/LEGACY_NOTICE.md).
 
 ## 10. License and citation
 
-MIT, see [LICENSE](LICENSE). The datasets keep their own licences. Citation metadata: [`CITATION.cff`](CITATION.cff) (to be completed with the release tag and DOI).
+MIT, see [LICENSE](LICENSE). The datasets keep their own licences. Citation metadata: [`CITATION.cff`](CITATION.cff) (version 1.0.0, release date 2026-10-28; accompanying manuscript remains unpublished).

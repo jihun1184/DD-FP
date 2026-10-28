@@ -1,29 +1,18 @@
-# Code availability: text for the manuscript and its basis in the repository
+# Code availability — DD-FP v1.0.0
 
-Status: for the author's approval. The release tag, commit hash and DOI are placeholders until the release is approved and archived. The text replaces the Code availability paragraph of manuscript V9 (`seg/95_declarations.tex`), which describes the public repository as it was before this release candidate and becomes wrong once the candidate branch is merged.
+Public repository: https://github.com/jihun1184/DD-FP
 
-## Proposed wording
+Formal release: https://github.com/jihun1184/DD-FP/releases/tag/v1.0.0
 
-> **Code availability.** The code used for the reported results is available at https://github.com/jihun1184/DD-FP, release `<TAG>` (commit `<HASH>`, archived at `<DOI>`), under the MIT licence: the sequential CPU reference of first-discovery front propagation; the GPU-FP worklist kernel (SHA-256 checked at load) and its wrappers; the z-slab direct-assembly and IBI driver; the whole-grid DWC verifiers; the scripts of the runtime, memory, GPU-implementation and topology evaluations; the numerical tests of the proof steps; and the scripts that recompute the tabulated statistics from the small stored records included in the repository. The three public datasets (BraTS 2021, DRIVE, CREMI) are not redistributed. The saved output arrays of the whole-grid verification, the arrays behind the qualitative figure, the raw rows of the comparison with local Min/Max interpolation and the records of the seam-layer survey are not included and are available from the corresponding author on request; `docs/FIGURE_TABLE_REPRODUCIBILITY.md` states for each figure and table whether it can be recomputed from the repository. The code of the earlier submission is preserved under the tag `pr-2026-legacy`; its sequential reference `cpu_fp.py` indexes non-cubic 3-D volumes differently from the evaluated version (`docs/CPU_FP_PROVENANCE.md`). The GPU measurements were made on one NVIDIA RTX 4090 system (driver 595.99.02, CUDA 13.2, CuPy 14.2.0, NumPy 2.2.6, Python 3.10.22); the GPU code was not run on other hardware.
+Version: 1.0.0; release date: 2026-10-28; licence: MIT.
+The release tag identifies the exact commit; resolve it with `git rev-parse 'v1.0.0^{commit}'`. The full SHA is also recorded in the GitHub release body and the synchronized manuscript. A commit cannot contain its own commit hash, so this versioned document uses the immutable release tag. No DOI has been issued or is claimed.
 
-## What each statement relies on
+The release contains the corrected sequential CPU FP reference; the frozen GPU-FP worklist kernel and wrappers; the z-slab direct-assembly driver and optional IBI; whole-grid DWC checkers; located runtime, memory, GPU-comparison and topology evaluation scripts; existing numerical proof-step tests; and scripts that recompute summaries from the included small stored records.
 
-| Statement | Basis in the release candidate |
-|---|---|
-| Sequential CPU reference | `src/ddfp/cpu_fp.py` (`8eae554f`) |
-| GPU-FP kernel, SHA-256 checked at load | `src/ddfp/gpu_native_worklist.py` (`853bf33a`), `gpu_seed_aware_worklist.py`, `gpu_immersion.py` |
-| Direct assembly and IBI driver | `scripts/ddfp/experiment_DDFP_all.py` (`run_ibi_v10`, `b6a9b109`) |
-| Whole-grid DWC verifiers | `gpu_immersion.verify_dwc_gpu`, `src/utils/benchmark_utils.verify_dwc`, `cmpb/evaluation/e_runtime_r7_runner/lib/r1_check53.py` |
-| Runtime, memory, GPU comparison, topology evaluation scripts | `cmpb/evaluation/` |
-| Numerical tests of the proof steps | `cmpb/theorem_tests/` |
-| Scripts recomputing tabulated statistics from small records | `cmpb/manuscript_tools/`, records in `cmpb/data/` |
-| Arrays, seam-layer survey, Min/Max rows not included | `docs/CODE_EXPERIMENT_MAPPING.md` (tiers V, F, O, qualitative arrays) |
-| Earlier code preserved | tag `pr-2026-legacy` (commit `8fdfe62`) |
-| One RTX 4090 system only | supplement S-C, environment record `cmpb/data/g5_environment.json` |
+Paths: `src/ddfp/`, `scripts/ddfp/experiment_DDFP_all.py`, `cmpb/evaluation/`, `cmpb/theorem_tests/`, `cmpb/manuscript_tools/`, `cmpb/data/`.
 
-## Items the author must settle before the statement is final
+BraTS 2021, DRIVE and CREMI are not redistributed. Saved whole-grid output arrays, qualitative source arrays/rasters, per-subject BraTS 3-D topology data, raw Min/Max comparison rows and complete seam-survey records are not part of this release. Some producing scripts or their correspondence to retained results remain unconfirmed. No request-based access is promised for material that has not been confirmed available.
 
-1. Release tag, commit hash and DOI (created only after approval).
-2. Whether the stored arrays are to be deposited in a data repository; if so the "available on request" sentence changes.
-3. Whether the unlocated producers (seam-layer survey, Min/Max C model, CREMI-3D aggregates) are to be added; until then the statement must not say that every table can be reproduced from the repository.
-4. The manuscript Data availability section and Supplement S-C must be checked for consistency with this wording (they currently describe the repository before replacement).
+`docs/CODE_EXPERIMENT_MAPPING.md` records code-to-result confidence and unlocated producers. `docs/FIGURE_TABLE_REPRODUCIBILITY.md` gives per-figure/table status; `docs/REPRODUCIBILITY.md` gives commands and limits; `docs/CPU_FP_PROVENANCE.md` distinguishes sequential-reference versions. The repository alone does not fully reproduce every figure, table or GPU measurement.
+
+The earlier Pattern Recognition submission code is preserved at `pr-2026-legacy`, commit `8fdfe6233dfe53f996ed2f09e8810bca53d5323b`. Citation metadata is in `CITATION.cff`; the accompanying CMPB manuscript remains unpublished. Scientific claim limits are in README §3 and RELEASE_NOTES.md.

@@ -15,7 +15,10 @@ authors:
     given-names: Jinglu
 repository-code: "https://github.com/jihun1184/DD-FP"
 license: MIT
-# version, date-released and doi are added when the release is approved and archived.
+version: "1.0.0"
+date-released: 2026-10-28
+url: "https://github.com/jihun1184/DD-FP/releases/tag/v1.0.0"
+# Release tag: v1.0.0. No DOI has been issued.
 keywords:
   - digital well-composedness
   - front propagation
@@ -36,4 +39,4 @@ preferred-citation:
       given-names: Hyeonjun
     - family-names: Hu
       given-names: Jinglu
-  notes: "Manuscript submitted to Computer Methods and Programs in Biomedicine."
+  notes: "Unpublished manuscript prepared for submission to Computer Methods and Programs in Biomedicine."
