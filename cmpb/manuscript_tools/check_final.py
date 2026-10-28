@@ -55,7 +55,7 @@ for n in ["0.8362", "0.8759", "12.59", "281"]:
     chk(f"E1 number {n} in supplement", has(supp, n))
 # --- scope phrases that must stay
 chk("independent checker limited to two arrays", has(main, "twosaveddirectassemblyarrays") or has(main, "twodirectassemblyarrays"))
-chk("proof status (not machine-verified, not externally reviewed) stated", has(main, "machine-verified") and has(main, "reviewedexternally"))
+chk("proof status (not machine-verified, not independently reviewed) stated", has(main, "machine-verified") and has(main, "independentlyreviewed"))
 chk("H-GPU unproved stated", has(main, "H-GPU"))
 chk("prior-result table present", has(main, "Lemma5", "Theorem2", "KeyLemma"))
 chk("Mazo cited", has(main, "Mazo"))
@@ -86,6 +86,14 @@ chk("title (new) in main", has(main, "DD-FP:GPUFrontPropagationwithSlabDomainDec
 chk("7.48 separate baseline statement", has(main, "7.48") and (has(main, "differentbaselines") or has(main, "separatebaseline")))
 # --- no stale files
 chk("no stale segment 70_experiments", not os.path.exists(os.path.join(R, "seg", "70_experiments.tex")))
+# --- Phase 3B: submission-form checks
+chk("DRIVE/CREMI-2D recomputation script passes on the stored record", subprocess.run([sys.executable, "-I", os.path.join(R, "tools", "recompute_drive_cremi2d.py")], capture_output=True).returncode == 0)
+for bad_phrase in ("Evidencelevel:", "systematicliteraturesearch", "verify_r23_numbers", "verify\\_r23\\_numbers"):
+    chk(f"absent from PDFs: {bad_phrase}", bad_phrase not in main and bad_phrase not in supp)
+chk("Code availability states the public scope", has(main, "Codeavailability") and "does not contain the level-synchronous worklist kernels" in re.sub(r"\s+", " ", open(os.path.join(R, "seg", "95_declarations.tex"), encoding="utf-8").read()))
+chk("AI declaration names tools and research uses", has(main, "ChatGPT(OpenAI)", "Claude(Anthropic)", "researchitself"))
+hl = re.findall(r"\\item (.*)", open(os.path.join(R, "seg", "10_front.tex"), encoding="utf-8").read().split("begin{highlights}")[1].split("end{highlights}")[0])
+chk("highlights: 3-5 items of at most 85 characters", 3 <= len(hl) <= 5 and max(map(len, hl)) <= 85)
 bad = [n for n, ok in res if not ok]
 for n, ok in res: print(("PASS " if ok else "FAIL ") + n)
 print(f"\n{len(res)-len(bad)}/{len(res)} passed"); sys.exit(1 if bad else 0)

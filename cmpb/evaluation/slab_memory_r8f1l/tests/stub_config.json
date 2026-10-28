@@ -1,0 +1,53 @@
+{
+ "schema": "R8D-1",
+ "python": "python3",
+ "repo": "/path/to/DD-FP",
+ "r7_runner": "/path/to/r7_runner",
+ "brats_root": "/path/to/BraTS2021",
+ "metadata": "/path/to/r7_runner/reference/benchmark_metadata.json",
+ "e6_rows": "/path/to/r7_runs/e6/rows.jsonl",
+ "e1_subjects": "/path/to/r7_runs/e1/subjects",
+ "gpu_index": 0,
+ "copies": [
+  1,
+  2,
+  4
+ ],
+ "reps": 3,
+ "delta": 1,
+ "max_rounds": 8,
+ "reserve_factor": 1.8,
+ "reserve_fixed_mib": 256,
+ "headroom_mib": 3072,
+ "vram_fraction": 0.75,
+ "host_fraction": 0.6,
+ "worker_timeout_s": 2400,
+ "smoke_shape": [
+  5,
+  5,
+  160
+ ],
+ "order_seed": 20261016,
+ "note": "1.8x+256 MiB is an unvalidated conservative admission scenario, not an R8-C scientific success band. First stage only; m=6/8 not enabled.",
+ "k_candidates": {
+  "1": [
+   8,
+   16,
+   32
+  ],
+  "2": [
+   8,
+   16,
+   32,
+   64
+  ],
+  "4": [
+   8,
+   16,
+   32,
+   64,
+   128
+  ]
+ },
+ "stage_timeout_s": 1800
+}

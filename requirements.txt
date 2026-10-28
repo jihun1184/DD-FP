@@ -21,4 +21,4 @@ h5py>=3.8.0             # exp_b4, prepare_cremi: CREMI HDF5
 pandas>=2.0.0           # verify_wilcoxon.py
 
 # ── Visualization (optional) ──────────────────────────────────────────────────
-matplotlib>=3.7.0       # exp_a2, exp_a3, analyse_epsilon: plotting (skipped gracefully if absent)
+matplotlib>=3.7.0       # exp_a2, exp_a3: plotting (skipped gracefully if absent)

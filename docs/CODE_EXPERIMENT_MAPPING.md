@@ -1,6 +1,6 @@
 # Code ↔ manuscript mapping
 
-Manuscript: *DD-FP: GPU Front Propagation with Slab Domain Decomposition for Digitally Well-Composed Interpolation of Biomedical Volumes* (V8 numbering). "Main" = main text, "S-x" = supplement section, "Fig./Tab." as in V8. Evidence identifiers V, E, S, F, G, M, O, C are those of the supplement provenance table (Table S-provenance).
+Manuscript: *DD-FP: GPU Front Propagation with Slab Domain Decomposition for Digitally Well-Composed Interpolation of Biomedical Volumes* (V9, Phase 3B final text). "Main" = main text, "S-x" = supplement section, "Fig./Tab." as in V9. Evidence identifiers V, E, S, F, G, M, O, C are those of the supplement provenance table (Table S-provenance).
 
 **Confidence of a mapping**
 
@@ -35,26 +35,23 @@ Manuscript: *DD-FP: GPU Front Propagation with Slab Domain Decomposition for Dig
 | Sec. 5.3, Tab. 2, S-E, Fig. S5: memory | allocated peak of direct assembly 0.165–0.233 and of IBI final 0.717–0.742 of single pass at matched slab thickness (≈ 9.7 layers); 59 records; model vs. records 1.0000004–1.0000117 | M (R8C, S3, S3b) | `cmpb/evaluation/memory_r8c/scripts/` (`r8c_scaling_runner.py`, `r8c_gpu_memory_probe.py`, `r8c_memory_model.py`, `r8c_validate.py`), `r8f1l` as above; table from `cmpb/manuscript_tools/make_tables.py` | A | The memory model is static accounting; the output arrays of these runs were not archived. |
 | Sec. 5.4, S-D: IBI | no advantage on any measured quantity; concentration criterion not met | S (H3/H4 of the frozen protocol) | `slab_memory_r8f1l/scripts/r8f1l_stats.py`, `r8f1l_compare.py` | A | |
 | Sec. 5.6, Tab. 4, S-H: comparison with Min/Max | exhaustive small volumes, 222 phantoms, 77 crops; FP vs Min vs Max | O (E1 record, pre-registration `e52de230…`) | – | **C** | The C model of the frozen kernel used for this record is not in the release; raw rows were not archived (manuscript states this). |
-| Sec. 5.7, Figs. 7–9, S-C.1, S-G: biomedical topology | DRIVE 9,544 critical blocks without interpolation, none for sequential FP and DD-FP; BraTS χ flips 26.78 % (335/1,251); CREMI 2D/3D | C | `scripts/part_b/exp_b1_topology_accuracy.py` (`888633e4`), `exp_b2_cc_analysis.py`, `exp_b3_brats_3d_all.py`, `exp_b4_cremi_3d.py`; `src/preprocessing/preprocessor.py`; `data/CREMI/prepare_cremi.py` | B | Values come from the earlier evaluation of the production IBI-final configuration; not re-run for the present manuscript. The kernel state at the time of that run must be confirmed. `tools/verify_r23_numbers.py` named in S-C.1 is not in the release. |
+| Sec. 5.7, Fig. 7, Tab. S13–S14, Fig. S6: DRIVE (20) and CREMI 2-D (50) | DRIVE 9,544 critical blocks without interpolation; none for sequential FP and DD-FP; β0 means 3.60 → 451.85 (see Tab. S13) | C | `cmpb/evaluation/topology_part_b/drive_cremi2d/run_exp_b1_corrected_r3.py` (runs the unchanged `scripts/part_b/exp_b1_topology_accuracy.py`, `888633e4`, on the corrected core; fail-closed); per-image record `cmpb/data/exp_b1_corrected.csv`; aggregates `cmpb/manuscript_tools/recompute_drive_cremi2d.py` | A (runner), E (aggregates) | Aggregates recomputed from the stored record: 19/19 checks pass (CPU). The pipeline itself was not re-run (needs the DRIVE and CREMI files). Sequential-FP version: `CPU_FP_PROVENANCE.md`. |
+| Sec. 5.7, Fig. 8, S-G.2: qualitative panels | 3 BraTS, 20 DRIVE, 30 CREMI-3D cases (illustrations) | C | `cmpb/evaluation/topology_part_b/qualitative/` (`select_representative_cases.py`, `export_qualitative_{brats,drive,cremi}_r3.py`, `make_qualitative_figures.py`, `build_hash_manifest.py`); per-case provenance in `cmpb/data/qualitative_cpu_fp_provenance.csv` | A (scripts), R (provenance) | Stored arrays are not in this repository. For the 3 BraTS cases the DD-FP driver hash recorded (`4e52fd14`) differs from the released driver (`b6a9b109`). |
+| Sec. 5.7, Tab. S8, Figs. 7–8 text: BraTS (1,251) χ-flip and baselines | DD-FP χ flips 26.78 % (335/1,251); no-interpolation 11.19 %; bilinear 15.51 %; CC, TSI, b0-consistency of the baselines | C | `cmpb/evaluation/topology_part_b/chiflip/` (`p6_k16_chiflip_server_shard.py`, `merge_k16_chiflip_shards.py`, `audit_k16_chiflip_results.py`, `preflight_chiflip_reference.py`, run scripts); derived summary `cmpb/data/brats_chiflip_k16_summary.json` | A (scripts), R (summary) | The baseline arms (`no_interp`, `naive_interp`) come from the earlier baseline rerun (record not included). The BraTS arrays are not archived; a re-run needs BraTS and a GPU. |
+| Sec. 5.7: CREMI 3-D aggregates; DD-FP CC and b0-consistency on 33 BraTS subjects | δ = 8 patch-boundary context for CREMI 3-D (not the slab halo) | C | probable: `scripts/part_b/exp_b3_brats_3d_all.py` (`6be95f2c`), `exp_b4_cremi_3d.py` (`ecc74137`); `src/preprocessing/preprocessor.py`; `data/CREMI/prepare_cremi.py` | **B / not located** | Producer and code state not confirmed. The scripts contain a `from_theorem` fallback; the manuscript uses no sequential-FP value from these runs (`CPU_FP_PROVENANCE.md`). |
 | Sec. 4, Thm. SA; S-A, S-A.7: proof and numerical consistency tests | consistency tests of the proof steps (e.g. 2,500 volumes / 8,198 windows in the span runs) | – | `cmpb/theorem_tests/r0_verify.py`, `r0_aux.py`, `r0lib.py`, logs and result JSON | A | Independent of the production code. They test steps of the proof and do not establish CUDA conformance (H-GPU) or replace formal verification. |
 | Sec. 3.1, 5.2, S-B: P1–P5 conformance (CPU model, tie rules) | CPU model: identical outputs for different orders inside a level in 4,500/4,500; `lower` vs `higher` differ in 575/1,500 arbitrary fields | MODEL | `cmpb/evaluation/conformance_r8f1j/` (Round-0 conformance harness, oracle, CPU references) | B | Which script produced the 4,500-input model counts is not named in the manuscript. |
 | S-B: GPU parity fixtures | 50 fixtures × 2 tie rules | – | `cmpb/evaluation/e_runtime_r7_runner/e2/gpu_parity/` | B | CPU self-check: 100/100 runs, digest matches reference (T). The GPU run itself is N. |
 
 ## 3. Figure and table scripts
 
-| Script (`cmpb/manuscript_tools/`) | Produces | Inputs | Runnable from this release? |
-|---|---|---|---|
-| `make_tables.py` | memory tables (`mem_main_table.tex`, `mem_full_table.tex`) | `data/p2_memory_recompute.json` | No: the stored records are not part of the release. |
-| `make_figs.py` | Fig. 6 (runtime), memory figure | `data/timing_E6_vs_P6.json`, `tierS_time_ratios_from_frozen_cli.csv`, `rows.jsonl`, `p2_memory_recompute.json` | No (same reason). |
-| `make_fig_dwc_mechanism.py`, `make_fig_qualitative.py`, `make_fig_frontier_main.py`, `make_fig_p4_*.py` | mechanism, qualitative, frontier figures | stored arrays and records | No. |
-| `build.py`, `assemble.sh`, `check_final.py`, `make_xref.py`, `*_preservation_check.py` | manuscript build and consistency checks | the manuscript package | Not applicable to the code release. |
-
-The TikZ sources of the schematic figures and tables (`figsrc/`) belong to the manuscript package and are not part of this repository.
+The map from every float of the manuscript to its generator, stored input and SHA-256 is in [`FIGURE_TABLE_REPRODUCIBILITY.md`](FIGURE_TABLE_REPRODUCIBILITY.md). The scripts in `cmpb/manuscript_tools/` read the small stored records in `cmpb/data/` (V9 layout: run them from a directory whose `../data` is `cmpb/data`, or copy as described there). The TikZ sources of the schematic figures (`figsrc/`) belong to the manuscript package and are not part of this repository.
 
 ## 4. Items for author confirmation
 
 1. Producer of tier V (whole-grid verification) and tier F (seam-layer survey), and the kernel version used when those arrays were produced.
 2. Producer of the Min/Max operator comparison (tier O); whether the C model may be released.
-3. State of the code used for tier C, in particular which `cpu_fp.py` (earlier public file `3ce62b0d` or evaluated file `8eae554f`) produced the sequential-FP arm of non-cubic 3-D results, and `tools/verify_r23_numbers.py`.
+3. Producer of the CREMI-3D aggregates and the 33-subject BraTS CC / b0 values (tier C, last row above).
 4. Mapping of the active-pile kernel (tier G) to `generic_worklists_v2.py`.
-5. Whether the stored records (per-volume rows, timing and memory records) are to be released together with the code. The manuscript currently states that they are held by the authors.
+5. DD-FP driver hash of the three BraTS qualitative cases (`4e52fd14`).
+6. Whether the stored arrays (whole-grid verification, qualitative panels) are to be deposited elsewhere.

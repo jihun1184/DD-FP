@@ -1,0 +1,123 @@
+{
+  "schema": "ddfp-figure4-dwc-mechanism-final-r0",
+  "figure_role": "Representative local DWC repair mechanism on frozen corrected DRIVE audit evidence",
+  "audit_consistency": {
+    "status": "PASS",
+    "checks": {
+      "n_cases_20": true,
+      "total_2x2_blocks_match": true,
+      "no_interp_total_violations_match": true,
+      "no_interp_mean_rate_match": true,
+      "no_interp_max_rate_match": true,
+      "sequential_total_zero": true,
+      "ddfp_total_zero": true,
+      "seq_ddfp_scalar_identity_20_of_20": true,
+      "candidate_selection_reproduced": true
+    },
+    "recomputed_candidate_selection": [
+      {
+        "selection_label": "lower",
+        "target_percentile": 0.25,
+        "case_id": "38_manual1",
+        "no_interp_violation_count": 183,
+        "actual_rank_one_based": 6
+      },
+      {
+        "selection_label": "median",
+        "target_percentile": 0.5,
+        "case_id": "21_manual1",
+        "no_interp_violation_count": 449,
+        "actual_rank_one_based": 10
+      },
+      {
+        "selection_label": "higher",
+        "target_percentile": 0.75,
+        "case_id": "33_manual1",
+        "no_interp_violation_count": 659,
+        "actual_rank_one_based": 15
+      }
+    ]
+  },
+  "selected_case": "33_manual1",
+  "selection_label": "higher",
+  "selection_basis": "pre-frozen no_interp DWC violation burden; rendering not used for candidate selection",
+  "selection_rank_one_based": 15,
+  "selection_population_n": 20,
+  "case_no_interp_violation_count": 659,
+  "witness_anchor_yx": [
+    572,
+    512
+  ],
+  "crop_y0_y1_x0_x1": [
+    524,
+    620,
+    464,
+    560
+  ],
+  "raw_2x2": [
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "sequential_fp_2x2": [
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      0
+    ]
+  ],
+  "ddfp_2x2": [
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      0
+    ]
+  ],
+  "raw_block_violates_dwc": true,
+  "sequential_block_violates_dwc": false,
+  "ddfp_block_violates_dwc": false,
+  "local_seqfp_ddfp_identity": true,
+  "frozen_audit": {
+    "scientific_status": "corrected Part-B presentation audit from frozen arrays; no algorithm rerun",
+    "threshold": 0.5,
+    "definition": "2x2 binary critical configuration: opposite corners equal, adjacent corners opposite (10/01 or 01/10)",
+    "n_cases": 20,
+    "total_2x2_blocks": 26304960,
+    "no_interp_total_violations": 9544,
+    "no_interp_mean_violation_rate": 0.00036282130822476064,
+    "no_interp_max_violation_rate": 0.000837864798121723,
+    "sequential_fp_total_violations": 0,
+    "ddfp_total_violations": 0,
+    "seq_ddfp_exact_scalar_identity_cases": 20,
+    "corrected_git_head": "8fdfe6233dfe53f996ed2f09e8810bca53d5323b",
+    "exp_b1_sha256": "888633e4e9cd5452dfd71003cfe600d4eb161103517db495e62fb924c8f1227d"
+  },
+  "audit_provenance": {
+    "source_summary_schema": "ddfp-drive-dwc-local-witness-audit-r0",
+    "input_sha256": {
+      "DD_FP_FIGUREGEN_CONFIGURATION_PROGRESS.md": "e775380b7b22b06bc7f495080862db663827b9c44cf2a28fb58c4699a492ad79",
+      "drive_dwc_audit_rows(1).csv": "980ff89cd0044e7879e35d3b552030ad2319b89f924fd0e6b75133be7462312c",
+      "drive_dwc_selected_cases(1).csv": "fe6226323dbb86fbad29e46cca26d998bcdf20fcb4c749e524779481e8a451d9",
+      "drive_dwc_audit_summary(1).json": "f411f2f3609343cf9281e1c65ea7b082694bbdc02094848d9448e1b1c33a63ba",
+      "diagnostic_witness(3).png": "da37b7c5fd6b1bd7a16009c1cd27fb7f5de31f7a21cda3e66f5e12697dffa0a5"
+    },
+    "render_source": "supplied frozen diagnostic_witness(3).png; no algorithm rerun"
+  },
+  "interpretation_boundary": [
+    "This audit reuses frozen corrected Part-B arrays and does not rerun DD-FP.",
+    "It audits 2-D DWC critical configurations in no_interp versus Sequential FP / corrected DD-FP at tau=0.5.",
+    "It does not revive the quarantined historical delta=0 4,745-face-block Figure S1.",
+    "A witness demonstrates a concrete local critical configuration in the audited DRIVE field; it is not by itself a universal theorem or segmentation-fidelity claim."
+  ]
+}

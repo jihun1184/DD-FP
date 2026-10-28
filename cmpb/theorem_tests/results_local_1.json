@@ -1,0 +1,27 @@
+{
+ "A1_A2_exhaustive": {
+  "vol": 14753,
+  "A1_viol": 0,
+  "A2_viol": 0
+ },
+ "N_exhaustive": {
+  "k3_noncritical_Y": 128,
+  "k3_antipodal_cases": 200,
+  "k3_violations": 0,
+  "k2_noncritical_Y": 14,
+  "k2_antipodal_cases": 12,
+  "k2_violations": 0
+ },
+ "T2_exhaustive_monotone_columns": {
+  "configs": 1296,
+  "face_xz": 0,
+  "face_yz": 0,
+  "cube": 0
+ },
+ "_meta": {
+  "mode": "local",
+  "N": 0,
+  "seed": 1,
+  "seconds": 21.7
+ }
+}

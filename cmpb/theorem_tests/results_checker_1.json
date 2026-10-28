@@ -1,0 +1,15 @@
+{
+ "random_cases": 3000,
+ "mismatch_vs_bruteforce": 0,
+ "positive_controls": [
+  true,
+  true,
+  true
+ ],
+ "_meta": {
+  "mode": "checker",
+  "N": 0,
+  "seed": 1,
+  "seconds": 0.9
+ }
+}

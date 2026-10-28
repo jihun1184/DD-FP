@@ -1,0 +1,136 @@
+{
+ "T3_keys": [
+  "backward",
+  "equal",
+  "f2",
+  "input",
+  "op",
+  "rounds",
+  "sha",
+  "test",
+  "tie",
+  "ties",
+  "visits"
+ ],
+ "T3_by_op_tie_f2_equal": {
+  "('B4', 'higher', 0, True)": 10,
+  "('B4', 'higher', 166, True)": 1,
+  "('B4', 'higher', 170, True)": 3,
+  "('B4', 'higher', 245, True)": 1,
+  "('B4', 'higher', 247, True)": 1,
+  "('B4', 'higher', 255, True)": 5,
+  "('B4', 'higher', 261, True)": 1,
+  "('B4', 'higher', 265, True)": 1,
+  "('B4', 'higher', 274, True)": 1,
+  "('B4', 'higher', 340, True)": 3,
+  "('B4', 'higher', 353, True)": 1,
+  "('B4', 'higher', 40, True)": 1,
+  "('B4', 'higher', 510, True)": 3,
+  "('B4', 'lower', 0, True)": 10,
+  "('B4', 'lower', 166, True)": 1,
+  "('B4', 'lower', 170, True)": 3,
+  "('B4', 'lower', 245, True)": 1,
+  "('B4', 'lower', 247, True)": 1,
+  "('B4', 'lower', 255, True)": 5,
+  "('B4', 'lower', 261, True)": 1,
+  "('B4', 'lower', 265, True)": 1,
+  "('B4', 'lower', 274, True)": 1,
+  "('B4', 'lower', 340, True)": 3,
+  "('B4', 'lower', 353, True)": 1,
+  "('B4', 'lower', 40, True)": 1,
+  "('B4', 'lower', 510, True)": 3,
+  "('B4c', 'higher', 255, True)": 32,
+  "('B4c', 'lower', 255, True)": 32,
+  "('B5', 'higher', 0, True)": 32,
+  "('B5', 'lower', 0, True)": 32
+ },
+ "T3_total": 192,
+ "T3_all_equal": true,
+ "T3_inputs": 32,
+ "T5_native_total": 12,
+ "T5_all_equal": true,
+ "T5_by_tie": {
+  "lower": 9,
+  "higher": 3
+ },
+ "T5_counters_all_identical": true,
+ "T5_counters_n": 12,
+ "T5_repeat_identical_all": true,
+ "T5_repeat_n": 3,
+ "T5_bucket_total_gpu": {
+  "00158": 80916965,
+  "00228": 83165031,
+  "01280": 83372436
+ },
+ "T5_ctrl_flow_tie": {
+  "00158/lower": {
+   "rounds": 13834,
+   "visits": 4035
+  },
+  "00158/higher": {
+   "rounds": 9888,
+   "visits": 597
+  },
+  "00228/lower": {
+   "rounds": 16254,
+   "visits": 5202
+  },
+  "00228/higher": {
+   "rounds": 10566,
+   "visits": 511
+  },
+  "01280/lower": {
+   "rounds": 14662,
+   "visits": 4455
+  },
+  "01280/higher": {
+   "rounds": 10178,
+   "visits": 528
+  }
+ },
+ "T6_n": 30,
+ "T6_all_identical_to_B5_operator": true,
+ "T6_sum_dwc_face": 0,
+ "T6_sum_dwc_cube": 0,
+ "T6_sum_ib_viol": 0,
+ "T6_sum_ib_empty": 0,
+ "T6_sum_sd_bad": 19670,
+ "T6_sum_vox_bad": 0,
+ "T6_sum_interval_bad": 0,
+ "T6_inputs_with_sd_bad": 25,
+ "T6_inputs_with_sd_bad_names": [
+  "crit2d_checker",
+  "crit3d_antipodal",
+  "mc3_a",
+  "mc3_b",
+  "mc4_g_K4",
+  "rand3d_00",
+  "rand3d_01",
+  "rand3d_02",
+  "rand3d_03",
+  "rand3d_04",
+  "rand3d_05",
+  "rand3d_06",
+  "rand3d_07",
+  "rand3d_08",
+  "rand3d_09",
+  "rand3d_10",
+  "rand3d_11",
+  "seam_ball_graded",
+  "seam_line_z",
+  "seam_plate",
+  "tie_checker3d",
+  "tie_heavy_0",
+  "tie_heavy_1",
+  "tie_heavy_2",
+  "two_voxel_inv"
+ ],
+ "T6_inputs_without_sd_bad": [
+  "isolated_bright",
+  "isolated_dark",
+  "mc4_c_K2",
+  "mc4_c_K4",
+  "seam_ball"
+ ],
+ "note": "T6 'identical' = the property values computed on the GPU C1 output equal those on the frozen B5 operator output; sd_bad counts violating cells of the self-duality test applied to the B5 (zero-frame) output."
+}

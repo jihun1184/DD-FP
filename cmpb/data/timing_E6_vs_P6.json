@@ -1,0 +1,61 @@
+{
+ "E6_R7_2026-10-15_16": {
+  "seq_over_k1": {
+   "ratio_of_means": 7.923811753042924,
+   "mean_of_ratios": 8.045272471636402,
+   "median_of_ratios": 7.934237576459662,
+   "min": 6.551188000904273,
+   "max": 10.419384770404239
+  },
+  "ddfp_over_k1": {
+   "ratio_of_means": 1.0272683040663602,
+   "mean_of_ratios": 1.0314255528110037,
+   "median_of_ratios": 1.0239194408974532,
+   "min": 0.9029338149298745,
+   "max": 1.1960321553229694,
+   "n_ddfp_slower": 13
+  },
+  "ddfp_incl_seam_over_k1": {
+   "ratio_of_means": 1.0399727023881316,
+   "mean_of_ratios": 1.0443269119945315
+  },
+  "means_s": {
+   "seq": 111.92671445,
+   "k1": 14.125362633333333,
+   "ddfp": 14.510537316666667,
+   "ddfp_incl_seam": 14.68999155
+  },
+  "mean_t_seam_s": 0.17945423333333332,
+  "reps": [
+   3
+  ],
+  "n_subjects": 20
+ },
+ "P6_2026-09-05": {
+  "seq_over_k1": {
+   "ratio_of_means": 7.830769684424024,
+   "mean_of_ratios": 7.948516589128775,
+   "median_of_ratios": 7.833202857908926,
+   "min": 6.466844433770393,
+   "max": 10.2716673460617
+  },
+  "ddfp_over_k1": {
+   "ratio_of_means": 1.0429224033164162,
+   "mean_of_ratios": 1.0466691275263216,
+   "median_of_ratios": 1.0435949001655227,
+   "min": 0.9435585103225852,
+   "max": 1.1920076710391752,
+   "n_ddfp_slower": 14
+  },
+  "means_s": {
+   "seq": 111.48322001591,
+   "k1": 14.23655968808,
+   "ddfp": 14.84762704485
+  },
+  "reps": [
+   5
+  ],
+  "n_subjects": 20
+ },
+ "note": "different executions; different DD-FP timed windows (E6 headline excludes the seam-layer count, P6 included it); never pooled"
+}

@@ -1,0 +1,104 @@
+{
+ "regression": {
+  "wall": {
+   "intercept_s": 0.08922028229082961,
+   "slope_us_per_launch": 12.74231758245644,
+   "resid_s": [
+    0.0007554138666264754,
+    0.0004030596432448297,
+    -0.0011584735098715826
+   ],
+   "slope_us_ci95": [
+    11.76992035841728,
+    12.983886318630493
+   ],
+   "intercept_ci95": [
+    0.08417973619226608,
+    0.109604465724751
+   ],
+   "launches": [
+    17869.0,
+    21456.0,
+    19117.0
+   ],
+   "caveat": "3 distinct launch counts, 2 parameters -> 1 degree of freedom; N is identical for the 3 subjects so the intercept absorbs all launch-independent work; descriptive, not causal"
+  },
+  "t_loop": {
+   "intercept_s": 0.05217506056983865,
+   "slope_us_per_launch": 12.402182493539069,
+   "resid_s": [
+    0.0004584174633819327,
+    0.00024459384108621585,
+    -0.000703011304468204
+   ],
+   "slope_us_ci95": [
+    11.67429408050235,
+    13.568752872153503
+   ],
+   "intercept_ci95": [
+    0.028935300557728593,
+    0.0675100644309266
+   ],
+   "launches": [
+    17869.0,
+    21456.0,
+    19117.0
+   ],
+   "caveat": "3 distinct launch counts, 2 parameters -> 1 degree of freedom; N is identical for the 3 subjects so the intercept absorbs all launch-independent work; descriptive, not causal"
+  }
+ },
+ "floor_comparison": {
+  "00158": {
+   "launches": 17869,
+   "t_loop_s": 0.2742480770102702,
+   "floor_launch_sync_s": 0.19959673,
+   "floor_share_of_loop": 0.7277962791058162,
+   "half_roundtrip_s": 0.22068215,
+   "half_roundtrip_share_of_loop": 0.8046807562181585
+  },
+  "00228": {
+   "launches": 21456,
+   "t_loop_s": 0.3185208819922991,
+   "floor_launch_sync_s": 0.23966352,
+   "floor_share_of_loop": 0.7524263982346826,
+   "half_roundtrip_s": 0.2649816,
+   "half_roundtrip_share_of_loop": 0.8319128037778272
+  },
+  "01280": {
+   "launches": 19117,
+   "t_loop_s": 0.2885645719943568,
+   "floor_launch_sync_s": 0.21353689,
+   "floor_share_of_loop": 0.7399969044161664,
+   "half_roundtrip_s": 0.23609495,
+   "half_roundtrip_share_of_loop": 0.8181702568970147
+  }
+ },
+ "floor_sources": {
+  "L_floor_us": 11.17,
+  "L_B5_round_us": 24.7,
+  "source": "P4-R1 status doc / gpu_micro2 (cross-experiment, B5 code path)"
+ },
+ "trace_vs_raw": {
+  "00158": {
+   "raw_rounds": 13834,
+   "trace_rounds": 13834,
+   "raw_visits": 4035,
+   "trace_visits": 4035,
+   "equal": true
+  },
+  "00228": {
+   "raw_rounds": 16254,
+   "trace_rounds": 16254,
+   "raw_visits": 5202,
+   "trace_visits": 5202,
+   "equal": true
+  },
+  "01280": {
+   "raw_rounds": 14662,
+   "trace_rounds": 14662,
+   "raw_visits": 4455,
+   "trace_visits": 4455,
+   "equal": true
+  }
+ }
+}

@@ -1,0 +1,129 @@
+{
+ "note": "Derived copy of brats_1251_k16_d1_chiflip_summary.json, independent_audit.json and shard_0_summary.json of the K=16 chi-flip run; machine paths removed, numbers unchanged.",
+ "source_sha256_prefix16": {
+  "brats_1251_k16_d1_chiflip_summary.json": "5bd07a9ca736c0a2",
+  "independent_audit.json": "8df52ab5741668e2",
+  "shard_0_summary.json": "7cb149725a11b91b"
+ },
+ "summary": {
+  "expected_subjects": 1251,
+  "actual_subjects": 1251,
+  "expected_rows": 1251,
+  "actual_rows": 1251,
+  "timing_policy": "time_s retained for operational provenance only; do not use for TIPS/runtime benchmark",
+  "configs": [
+   {
+    "K": 16,
+    "delta": 1,
+    "n": 1251,
+    "dwc_pass": 1251,
+    "dwc_fail": 0,
+    "dwc_pass_pct": 100.0,
+    "dwc_wilson95_pct": [
+     99.69385777455894,
+     99.99999999999999
+    ],
+    "R_eq_2": 1251,
+    "R_eq_2_pct": 100.0,
+    "R_le_2": 1251,
+    "R_gt_2": 0,
+    "R_mean": 2.0,
+    "R_median": 2.0,
+    "R_min": 2,
+    "R_max": 2,
+    "bdry_viol_sum": 0,
+    "bdry_viol_max": 0,
+    "chi_flip_n": 335,
+    "chi_flip_pct": 26.778577138289368,
+    "ref_chi_zero_n": 2,
+    "ddfp_chi_min": -857,
+    "ddfp_chi_max": 2006,
+    "chi_formula_mismatch": 0
+   }
+  ]
+ },
+ "independent_audit": {
+  "scope": {
+   "K": 16,
+   "delta": 1,
+   "expected_subjects": 1251
+  },
+  "execution_integrity": {
+   "pass": true,
+   "checks": {
+    "required_columns_present": true,
+    "row_count_exact": true,
+    "unique_subject_count_exact": true,
+    "duplicate_key_count_zero": true,
+    "config_exactly_k16_delta1": true,
+    "failure_record_count_zero": true,
+    "dwc_field_consistent": true,
+    "rstar_within_recorded_cap": true,
+    "chi_flip_binary": true,
+    "chi_flip_formula_exact": true,
+    "reference_subjects_present": true,
+    "reference_chi_values_exact": true
+   },
+   "observed_rows": 1251,
+   "observed_subjects": 1251,
+   "duplicate_keys": 0,
+   "wrong_config_rows": 0,
+   "failure_records": 0,
+   "missing_columns": [],
+   "inconsistent_dwc_rows": 0,
+   "invalid_rstar_rows": 0,
+   "invalid_chi_flip_rows": 0,
+   "chi_formula_mismatch_rows": 0,
+   "missing_reference_subjects": [],
+   "reference_chi_mismatch_rows": 0
+  },
+  "scientific_results": {
+   "dwc_pass": 1251,
+   "dwc_fail": 0,
+   "boundary_violation_sum": 0,
+   "boundary_violation_max": 0,
+   "rstar_counts": {
+    "2": 1251
+   },
+   "rstar_min": 2,
+   "rstar_max": 2,
+   "rstar_mean": 2.0,
+   "all_subjects_dwc": true,
+   "all_subjects_rstar2": true,
+   "dwc_verdict": "PASS",
+   "rstar2_verdict": "PASS",
+   "chi_flip_n": 335,
+   "chi_flip_pct": 26.778577138289368,
+   "ref_chi_zero_n": 2,
+   "ddfp_chi_min": -857,
+   "ddfp_chi_max": 2006
+  },
+  "source_files": {
+   "csv": "brats_1251_k16_d1_chiflip_merged.csv",
+   "reference_chi_csv": "brats_ref_chi_1251.csv",
+   "failure_files": [
+    "shard_0_failures.tsv"
+   ]
+  },
+  "timing_policy": "Any time_s field is execution provenance only and is excluded from runtime, speedup, and TIPS claims."
+ },
+ "shard_provenance": {
+  "head": "8fdfe6233dfe53f996ed2f09e8810bca53d5323b",
+  "changed_paths": [
+   "src/ddfp/cpu_fp.py",
+   "src/ddfp/gpu_immersion.py",
+   "src/ddfp/gpu_native_worklist.py",
+   "src/ddfp/gpu_seed_aware_worklist.py",
+   "test/test_smoke.py"
+  ],
+  "sha256": {
+   "scripts/ddfp/experiment_DDFP_all.py": "b6a9b109f4105e7b77ebed880f669ba670bbd87123deca9509ba5b00993e561e",
+   "src/ddfp/gpu_immersion.py": "b784a376d3466a1d4ded5089a2eee9f27df35006b4926301dd06106b4ed262a4",
+   "src/ddfp/gpu_native_worklist.py": "853bf33a6bbd9c91f5304a018f0a51ff53e8418360fe1477208cf81df17163ac",
+   "src/ddfp/gpu_seed_aware_worklist.py": "c80f56b9ba7afd63196332d51894168d36f6e9f3e2a51b6b966786311e4eecad"
+  },
+  "metric_sha256": "6be95f2c698d1fc5d3aa841bcf1e7c2d612d6ff9603a826449f3c2fa566e16d3",
+  "metric_function": "topology_metrics_3d",
+  "reference_chi_csv_sha256": "6c52fc567e81684aadc9faaaefe4d910269b22515b12a78e8d2b638bdcf6d252"
+ }
+}

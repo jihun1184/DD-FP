@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the software and the accompanying manuscript."
+title: "DD-FP: GPU front propagation with slab domain decomposition for digitally well-composed interpolation"
+type: software
+authors:
+  - family-names: Bae
+    given-names: Jihun
+  - family-names: Lee
+    given-names: Hunmin
+  - family-names: Bae
+    given-names: Yeonho
+  - family-names: Choe
+    given-names: Hyeonjun
+  - family-names: Hu
+    given-names: Jinglu
+repository-code: "https://github.com/jihun1184/DD-FP"
+license: MIT
+# version, date-released and doi are added when the release is approved and archived.
+keywords:
+  - digital well-composedness
+  - front propagation
+  - GPU
+  - domain decomposition
+  - biomedical image processing
+preferred-citation:
+  type: unpublished
+  title: "DD-FP: GPU Front Propagation with Slab Domain Decomposition for Digitally Well-Composed Interpolation of Biomedical Volumes"
+  authors:
+    - family-names: Bae
+      given-names: Jihun
+    - family-names: Lee
+      given-names: Hunmin
+    - family-names: Bae
+      given-names: Yeonho
+    - family-names: Choe
+      given-names: Hyeonjun
+    - family-names: Hu
+      given-names: Jinglu
+  notes: "Manuscript submitted to Computer Methods and Programs in Biomedicine."

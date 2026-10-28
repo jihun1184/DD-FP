@@ -1,0 +1,60 @@
+{
+ "collected": "2026-10-23T12:04:11+0900",
+ "python": "3.10.22 | packaged by conda-forge | (main, Oct  6 2026, 23:02:24) [GCC 14.4.0]",
+ "executable": "/opt/anaconda3/envs/ddfp/bin/python",
+ "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+ "machine": "x86_64",
+ "cpu": "model name\t: Intel(R) Core(TM) i9-14900KF",
+ "nproc": 32,
+ "mem": "MemTotal:       64625196 kB\nSwapTotal:       8388604 kB",
+ "env": {
+  "CUDA_VISIBLE_DEVICES": null,
+  "CUDA_PATH": null,
+  "CUPY_ACCELERATORS": null,
+  "CUPY_CACHE_DIR": null,
+  "OMP_NUM_THREADS": null,
+  "PYTHONHASHSEED": null
+ },
+ "packages": {
+  "numpy": "2.2.6",
+  "cupy": "14.2.0",
+  "nibabel": "5.4.2",
+  "scipy": "1.15.3"
+ },
+ "cuda": {
+  "runtime": 13020,
+  "driver": 13020,
+  "device0": "NVIDIA GeForce RTX 4090",
+  "nvrtc": [
+   13,
+   2
+  ]
+ },
+ "nvidia_smi_L": "GPU 0: NVIDIA GeForce RTX 4090 (UUID: GPU-3abce830-a2e9-7a33-a1c9-8a56ab5a7ba9)",
+ "nvidia_smi_query": "index, name, uuid, driver_version, pstate, clocks.current.sm [MHz], clocks.max.sm [MHz], clocks.current.memory [MHz], persistence_mode, power.limit [W], memory.total [MiB], memory.used [MiB], temperature.gpu\n0, NVIDIA GeForce RTX 4090, GPU-3abce830-a2e9-7a33-a1c9-8a56ab5a7ba9, 595.99.02, P2, 2520 MHz, 3105 MHz, 10251 MHz, Disabled, 450.00 W, 24564 MiB, 832 MiB, 50",
+ "nvidia_smi_compute_apps": "pid, process_name, used_gpu_memory [MiB]\n7302, /usr/libexec/gnome-remote-desktop-daemon, 516 MiB\n10192, /usr/bin/nautilus, 28 MiB\n10692, /usr/bin/ptyxis, 51 MiB",
+ "code_sha256": {
+  "frozen/cpu_fp.py": "8eae554f7d3d688dee2285f41d20bfbf6e34af98016a3f1ad07f1ff5f8f36a88",
+  "frozen/g8_gpufp_semantic_probe.py": "566655ceac7794ade9e2c0190d3f195f6f588dd6b58f23f2177df3039f1f5bb8",
+  "frozen/gpu_native_worklist.py": "853bf33a6bbd9c91f5304a018f0a51ff53e8418360fe1477208cf81df17163ac",
+  "src/af_worklist.py": "7b0a6529f922949100f357267e78538e219d9e7e464faee877a7a17d1ff7b608",
+  "src/fakecupy.py": "92a3842e1f6b0e6fc2c01d7bd8c0fba81b0beb230e382ee39638a299bc9f7cda",
+  "tests/closure_depth_trace.py": "bba4e24854e5bc6d8eae40a485a705f5d29797031c264097dae71a8be3d2151e",
+  "tests/collect_env.py": "c09ac94dad453ff95f32dad8a7963165f189461a3924f529359486157cae8453",
+  "tests/g4_shim_selftest.py": "abc596879979f07b1ab3e5412bb5d206d9366946a609bc8a9482d209a11e3d5b",
+  "tests/gate_verdict.py": "6993afd3d8daaf7c705fa580cd069b6bae9b31fe8fb254769918b2a9cc6b954c",
+  "tests/gpu_small_gate.py": "080169105bc379442f8c9d97770a08f19d5824787abb02d546fca3dfe1d266d3",
+  "tests/harness.py": "61c1d1c6cfafa4aac91c0b99b05342835a86bef3fc791df4d388584b818052dd",
+  "tests/medium_shim.py": "ee39df43d668b628ba55e53f746fda6697cfa5383ccbeee300e1a19eaf568fd9",
+  "tests/mutants.py": "8adb35062e8bd5830f52a105fda68239af416cc03123fb40f0accda21ac9fe19",
+  "tests/nvrtc_compile.py": "725022038f5ac9175f2fa40aca3e0ce7bede65a6f9bf9d70d37a59de574bd751",
+  "tests/reeval_g3.py": "5d9ceb0162638554460d25c0bc910409ca8ec6be2227b09075abac400205fb87",
+  "tests/run_g4_full_accuracy.py": "4b3b97f7666da7cb7cc26a2b2e051096279baf0ce94b77ffd435d3bf8d38f634",
+  "tests/run_gpu_gate.py": "959ca7dc3b37290bea6d36face82dca43ed941fb0846a4a1cdea595a88ec4df8",
+  "tests/subject_io.py": "6ce37c9b86384c9e00e8fddea50f7055c6bb475b5aa1fe58098da515aae28e27",
+  "tests/test_gate_verdict.py": "01df43188dc34e9a630a0c6cd7bf1ba8d94db22342484cc139f4c4104fb02937",
+  "tests/tsan_control.py": "33b2195dad64b10a12726fdb1789c199b25d71a483590555999ca31c21eb95ed",
+  "tests/tsan_run.py": "fd11dc59d6f6fcbe0ad63a9d4cbf5fbbb8c74af6067b7ecb2be616e70205c3b6"
+ },
+ "file_sha256": {}
+}

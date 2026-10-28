@@ -1,0 +1,21 @@
+{
+ "maps": 2400,
+ "runs": 72000,
+ "maps_with_distinct_outputs": 4,
+ "max_distinct_outputs": 2,
+ "pairs": 30055380,
+ "adm_bad": 0,
+ "range": 0,
+ "F1": 0,
+ "F2": 0,
+ "F3": 0,
+ "KL": 0,
+ "P": 0,
+ "Q": 0,
+ "_meta": {
+  "mode": "arbitrary",
+  "N": 2400,
+  "seed": 20261101,
+  "seconds": 592.9
+ }
+}

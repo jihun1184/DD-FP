@@ -1,0 +1,220 @@
+{
+ "subjects": {
+  "00158": {
+   "arms": {
+    "cpu_frozen": {
+     "wall": {
+      "n": 7,
+      "median": 2.6173561610048637,
+      "q1": 2.6144301070307847,
+      "q3": 2.635701681516366,
+      "iqr_over_median": 0.008127122629506685
+     },
+     "n_valid": 7,
+     "kernel_median_s": null,
+     "peak_alloc_B": null,
+     "peak_reserved_B": null,
+     "rss_MiB": 1972.4765625
+    },
+    "gpu_b5": {
+     "wall": {
+      "n": 7,
+      "median": 13.063478365016636,
+      "q1": 13.060523912485223,
+      "q3": 13.066544251516461,
+      "iqr_over_median": 0.00046085268127057846
+     },
+     "n_valid": 7,
+     "kernel_median_s": 12.995743030973244,
+     "peak_alloc_B": 2831335424.0,
+     "peak_reserved_B": 2973420544.0,
+     "rss_MiB": null
+    },
+    "cpu_c1": {
+     "wall": {
+      "n": 7,
+      "median": 1.5212427719961852,
+      "q1": 1.5142822790076025,
+      "q3": 1.5404739869991317,
+      "iqr_over_median": 0.017217309737590614
+     },
+     "n_valid": 7,
+     "kernel_median_s": null,
+     "peak_alloc_B": null,
+     "peak_reserved_B": null,
+     "rss_MiB": 2032.0234375
+    },
+    "gpu_c1": {
+     "wall": {
+      "n": 7,
+      "median": 0.31766816903837025,
+      "q1": 0.3172714760003146,
+      "q3": 0.3182597245031502,
+      "iqr_over_median": 0.003110945946605886
+     },
+     "n_valid": 7,
+     "kernel_median_s": 0.29418323701247573,
+     "peak_alloc_B": 1266003968.0,
+     "peak_reserved_B": 1442328576.0,
+     "rss_MiB": null
+    }
+   },
+   "sha_mismatch": [],
+   "errors": [],
+   "rho_B5": 41.12303226527784,
+   "rho_C": 8.239277384725067,
+   "rho_cpuC1": 4.788779362443577,
+   "cpu_c1_vs_cpu_frozen": 1.7205381081747728,
+   "unstable_arms": [],
+   "class": "GO",
+   "mem_ratio_alloc_c1_over_b5": 0.44714022834194583,
+   "mem_ratio_reserved_c1_over_b5": 0.4850738584255911
+  },
+  "00228": {
+   "arms": {
+    "cpu_frozen": {
+     "wall": {
+      "n": 7,
+      "median": 2.708531720971223,
+      "q1": 2.6897516989556607,
+      "q3": 2.843158509465866,
+      "iqr_over_median": 0.056638365843172264
+     },
+     "n_valid": 7,
+     "kernel_median_s": null,
+     "peak_alloc_B": null,
+     "peak_reserved_B": null,
+     "rss_MiB": 2011.25390625
+    },
+    "gpu_b5": {
+     "wall": {
+      "n": 7,
+      "median": 15.238760041014757,
+      "q1": 15.229628653993132,
+      "q3": 15.243930407508742,
+      "iqr_over_median": 0.0009385116293660143
+     },
+     "n_valid": 7,
+     "kernel_median_s": 15.16982381802518,
+     "peak_alloc_B": 2831335424.0,
+     "peak_reserved_B": 2973420544.0,
+     "rss_MiB": null
+    },
+    "cpu_c1": {
+     "wall": {
+      "n": 7,
+      "median": 1.6401848189998418,
+      "q1": 1.552958624495659,
+      "q3": 1.9011044680082705,
+      "iqr_over_median": 0.21226013037049396
+     },
+     "n_valid": 7,
+     "kernel_median_s": null,
+     "peak_alloc_B": null,
+     "peak_reserved_B": null,
+     "rss_MiB": 2070.6875
+    },
+    "gpu_c1": {
+     "wall": {
+      "n": 7,
+      "median": 0.36302250798325986,
+      "q1": 0.3616668334871065,
+      "q3": 0.363204372493783,
+      "iqr_over_median": 0.0042353820296658455
+     },
+     "n_valid": 7,
+     "kernel_median_s": 0.3399733600090258,
+     "peak_alloc_B": 1274996224.0,
+     "peak_reserved_B": 1451320832.0,
+     "rss_MiB": null
+    }
+   },
+   "sha_mismatch": [],
+   "errors": [],
+   "rho_B5": 41.97745237801471,
+   "rho_C": 7.461057266168527,
+   "rho_cpuC1": 4.518135330262982,
+   "cpu_c1_vs_cpu_frozen": 1.6513576333567346,
+   "unstable_arms": [
+    "cpu_frozen"
+   ],
+   "class": "UNSTABLE",
+   "mem_ratio_alloc_c1_over_b5": 0.4503162052762845,
+   "mem_ratio_reserved_c1_over_b5": 0.48809807106787784
+  },
+  "01280": {
+   "arms": {
+    "cpu_frozen": {
+     "wall": {
+      "n": 7,
+      "median": 2.760670226009097,
+      "q1": 2.752598109014798,
+      "q3": 2.8457722015155014,
+      "iqr_over_median": 0.03375053333892709
+     },
+     "n_valid": 7,
+     "kernel_median_s": null,
+     "peak_alloc_B": null,
+     "peak_reserved_B": null,
+     "rss_MiB": 2028.72265625
+    },
+    "gpu_b5": {
+     "wall": {
+      "n": 7,
+      "median": 13.804431200027466,
+      "q1": 13.80132568650879,
+      "q3": 13.807520415983163,
+      "iqr_over_median": 0.0004487493461056792
+     },
+     "n_valid": 7,
+     "kernel_median_s": 13.73705952707678,
+     "peak_alloc_B": 2831335424.0,
+     "peak_reserved_B": 2973420544.0,
+     "rss_MiB": null
+    },
+    "cpu_c1": {
+     "wall": {
+      "n": 7,
+      "median": 1.6071508240420371,
+      "q1": 1.5868705780012533,
+      "q3": 1.6156907739932649,
+      "iqr_over_median": 0.01793247750047991
+     },
+     "n_valid": 7,
+     "kernel_median_s": null,
+     "peak_alloc_B": null,
+     "peak_reserved_B": null,
+     "rss_MiB": 2085.69921875
+    },
+    "gpu_c1": {
+     "wall": {
+      "n": 7,
+      "median": 0.3316566940047778,
+      "q1": 0.33065945049747825,
+      "q3": 0.3380353674874641,
+      "iqr_over_median": 0.022239614406454878
+     },
+     "n_valid": 7,
+     "kernel_median_s": 0.3086036359309219,
+     "peak_alloc_B": 1275826176.0,
+     "peak_reserved_B": 1452150784.0,
+     "rss_MiB": null
+    }
+   },
+   "sha_mismatch": [],
+   "errors": [],
+   "rho_B5": 41.622652126625255,
+   "rho_C": 8.323879107259408,
+   "rho_cpuC1": 4.845826582408389,
+   "cpu_c1_vs_cpu_frozen": 1.7177418476916315,
+   "unstable_arms": [],
+   "class": "GO",
+   "mem_ratio_alloc_c1_over_b5": 0.45060933621123656,
+   "mem_ratio_reserved_c1_over_b5": 0.4883771947194833
+  }
+ },
+ "status": "FINISHED",
+ "label": "[GPU]",
+ "overall": "HOLD",
+ "overall_note": "UNSTABLE subjects force HOLD (never GO / NO-GO)."
+}

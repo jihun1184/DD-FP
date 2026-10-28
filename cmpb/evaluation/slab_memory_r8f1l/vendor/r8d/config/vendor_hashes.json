@@ -1,0 +1,12 @@
+{
+  "vendor/r8c/scripts/r8c_analyze.py": "e30e2be2bf61992844105cf81a6975020847222975ad38e9e3a3a88b609b65ef",
+  "vendor/r8c/scripts/r8c_audit.py": "719ee72f5db0ae132100a2f0209dde1ea809ecaa794f26f6e6bf7d0c4171b18f",
+  "vendor/r8c/scripts/r8c_build_reports.py": "e895cedb9ae1cdee4c02cfff93b6f13ef249fff5b70d2298fbca02d93f17a591",
+  "vendor/r8c/scripts/r8c_common.py": "8f659edeb99295f7d0fbd0288d08d58d90dad9ead0c6e12f52bd3d16520c6bbe",
+  "vendor/r8c/scripts/r8c_cpu_ibi_regression.py": "2d568a6ec8d6eddaa02edd84086701860571d2ca97269845ebb44be683b4de05",
+  "vendor/r8c/scripts/r8c_gpu_memory_probe.py": "6cf80747db3ad8edc780c206c94114f7e926652f0f50f2220173d8bde7c464e8",
+  "vendor/r8c/scripts/r8c_memory_model.py": "be6bc92ce1049353a121fd7c3a41d36d8274767924e5ba32e813126330547976",
+  "vendor/r8c/scripts/r8c_package.py": "db03cff47044698fba40fbbe0fdf05d9704334b6bb98288d16020991e31645ce",
+  "vendor/r8c/scripts/r8c_scaling_runner.py": "034b223c36d09b54254ef63b35aa046dc7e2024839144a4e87e538719bd31801",
+  "vendor/r8c/scripts/r8c_validate.py": "2ed8e0338a53cccc370c65c30c5f59e862af1cab19258cd827c17d2186079d57"
+}
