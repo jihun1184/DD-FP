@@ -15,10 +15,10 @@ authors:
     given-names: Jinglu
 repository-code: "https://github.com/jihun1184/DD-FP"
 license: MIT
-version: "1.0.0"
-date-released: 2026-10-28
-url: "https://github.com/jihun1184/DD-FP/releases/tag/v1.0.0"
-# Release tag: v1.0.0. No DOI has been issued.
+version: "1.0.1"
+date-released: 2026-10-29
+url: "https://github.com/jihun1184/DD-FP/releases/tag/v1.0.1"
+# Release tag: v1.0.1 (documentation and evidence-record release; source files identical to v1.0.0). No DOI has been issued.
 keywords:
   - digital well-composedness
   - front propagation

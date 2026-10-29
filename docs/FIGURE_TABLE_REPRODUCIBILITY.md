@@ -34,7 +34,8 @@ Requirements: `numpy`, `matplotlib` (CPU only).
 | Fig. S5 (memory) | `make_figs.py` → `fig_memory.pdf` | `p2_memory_recompute.json` | RC |
 | Tab. S11 (time per volume) | `make_tables.py` → `g5_table.tex` | `subject_table.csv` | RC (byte-identical `.tex`) |
 | Tab. 3, Tab. S3, S7, S8, S10 (DWC scope, whole-grid and seam-layer records, differing cells) | – (values quoted from evaluation records of tiers V and F) | arrays and records not in this repository | NG; see `CODE_EXPERIMENT_MAPPING.md` |
-| Tab. 4, Tab. S12, S15 (Min/Max, operators) | – | record E1 (not in this repository) | NG |
+| Tab. 4, S-M (held-out slice reconstruction: BraTS 1,251; CREMI 9 ROIs) | `cmpb/manuscript_tools/recompute_reconstruction.py` | `cmpb/data/reconstruction/*.jsonl` | RC (21 checks pass on the stored per-unit metrics; the GPU run and pixel-level reconstruction were not repeated) |
+| Tab. S12, S15 (Min/Max operator comparison, 77 crops) | – | record E1 (not in this repository) | NG |
 | Tab. S1, S6, S16 (proof steps, assumptions, contributions) | – | `cmpb/theorem_tests/results_*.json` and logs (Table S1) | NG (the tests themselves run: `python cmpb/theorem_tests/r0_verify.py checker`) |
 | Fig. 7 (DRIVE DWC mechanism) | `make_fig_dwc_mechanism.py` composes panels from `paper/figure_sources/` | `FIG4_DWC_MECHANISM_SUMMARY_FROZEN.json` `ab37cf6aa7b7`; panel sources not in this repository | GO |
 | Fig. 8 (qualitative) | `make_fig_qualitative.py` composes a stored figure; panels from `cmpb/evaluation/topology_part_b/qualitative/` | stored arrays/rasters (not in this repository); provenance `qualitative_cpu_fp_provenance.csv` `f33165fdeab3` | GO |
@@ -54,4 +55,4 @@ Requirements: `numpy`, `matplotlib` (CPU only).
 
 (c) *Derived records.* `brats_chiflip_k16_summary.json` (its `source_sha256_prefix16` field names the three source files) and `qualitative_cpu_fp_provenance.csv` (extracted by `cmpb/provenance/extract_cpu_fp_provenance.py` from the per-case `case_provenance.json` files) were derived from run records outside this repository; machine paths were removed and numbers unchanged.
 
-(d) *Not reproducible from this repository.* The GPU measurements (runtime, memory, whole-grid and seam-layer verification, GPU comparison), the BraTS/DRIVE/CREMI pipelines (need the datasets), the operator comparison with Min/Max, and the qualitative arrays. Their producing code is included where located, and the code state is documented; the results themselves are not claimed to be reproduced here.
+(d) *Not reproducible from this repository.* The GPU measurements (runtime, memory, whole-grid and seam-layer verification, GPU comparison), the BraTS/DRIVE/CREMI pipelines (need the datasets), the 77-crop operator comparison with Min/Max (record E1), and the qualitative arrays. The held-out slice reconstruction table is re-aggregated from stored per-unit metrics only. Their producing code is included where located, and the code state is documented; the results themselves are not claimed to be reproduced here.

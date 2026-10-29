@@ -1,8 +1,8 @@
-# DD-FP v1.0.0 — CMPB Submission Code
+# DD-FP v1.0.1 — CMPB Submission Code
 
-Formal software release for manuscript V9 (Phase 3B), dated 2026-10-28.
-Target: the verified documentation-finalized `main` commit identified by tag
-[`v1.0.0`](https://github.com/jihun1184/DD-FP/releases/tag/v1.0.0).
+Formal software release for the CMPB submission, dated 2026-10-29. It supersedes `v1.0.0` (2026-10-28), which is left unchanged.
+Target: the verified `main` commit identified by tag
+[`v1.0.1`](https://github.com/jihun1184/DD-FP/releases/tag/v1.0.1).
 The earlier Pattern Recognition code remains at `pr-2026-legacy`
 (`8fdfe6233dfe53f996ed2f09e8810bca53d5323b`). No DOI is claimed.
 
@@ -33,8 +33,16 @@ Earlier release-preparation checks (Python 3.13 on Linux) are recorded separatel
 
 Stored records support recomputing DRIVE/CREMI-2D aggregates, timing and memory tables and selected plotted quantities. This recomputes summaries, not the underlying GPU measurements. The per-figure/table status is in `docs/FIGURE_TABLE_REPRODUCIBILITY.md`, and experiment-to-code confidence is in `docs/CODE_EXPERIMENT_MAPPING.md`.
 
-BraTS 2021, DRIVE and CREMI datasets are not redistributed. Whole-grid output arrays, qualitative source arrays/rasters, per-subject BraTS 3-D topology data, raw Min/Max comparison rows and complete seam-survey records are not included. Some producers and code-to-record mappings remain unconfirmed. Availability on request is not promised for unarchived or unlocated material.
+BraTS 2021, DRIVE and CREMI datasets are not redistributed. Whole-grid output arrays, qualitative source arrays/rasters, per-subject BraTS 3-D topology data, raw rows of the 77-crop Min/Max operator comparison and complete seam-survey records are not included. The per-subject/per-ROI held-out reconstruction metrics (BraTS 1,251; CREMI 9) are included in `cmpb/data/reconstruction/` with their producer scripts and a stdlib recomputation script (21 checks); the GPU computation was not repeated. Some producers and code-to-record mappings remain unconfirmed. Availability on request is not promised for unarchived or unlocated material.
 
-Theorem SA is conditional on the stated unseeded direct-assembly assumptions; IBI is outside it. H-GPU is not proved; finite zero-violation observations are not a general guarantee. GPU-FP identity was observed on the tested volumes; DD-FP is a different operator. Timing is from one RTX 4090 against an unoptimized single-thread Python reference, and memory results retain their effective-sample-size and full-volume-array limitations. IBI showed no advantage on the measured quantities. No clinical, downstream or topology-preservation benefit is claimed.
+Theorem 3.1 (Supplement S-A) is conditional on the stated unseeded direct-assembly assumptions; IBI is outside it. H-GPU is not proved; finite zero-violation observations are not a general guarantee. GPU-FP identity was observed on the tested volumes; DD-FP is a different operator. Timing is from one RTX 4090 against an unoptimized single-thread Python reference, and memory results retain their effective-sample-size and full-volume-array limitations. IBI showed no advantage on the measured quantities. No clinical, downstream or topology-preservation benefit is claimed.
 
 These are software-release and evidence-scope notes. Development history is not evidence of scientific novelty or theorem validity. The accompanying manuscript is unpublished. MIT applies to the code; datasets retain their own terms.
+
+## Changes from v1.0.0 (documentation and added evidence records; no source file changed)
+
+- The DRIVE and CREMI-2D arm labelled `ddfp` executes single-window GPU-FP (K = 1), not slab assembly or IBI (`README.md` §3, `docs/CODE_EXPERIMENT_MAPPING.md`, `docs/LEGACY_NOTICE.md`).
+- The theorem is cited as Theorem 3.1 (Supplement S-A), matching the manuscript; the earlier name "Theorem SA" is retired.
+- The README states that the saved whole-grid arrays and the generator of the direct-assembly arrays are not included.
+- Added `cmpb/data/reconstruction/` (BraTS 1,251 and CREMI 9 held-out slice reconstruction metrics), `cmpb/evaluation/reconstruction_minmax/` (producer scripts) and `cmpb/manuscript_tools/recompute_reconstruction.py` (21 checks, 0 failures; stdlib only).
+- Source files are unchanged: `SHA256SUMS.txt` still lists their v1.0.0 hashes.

@@ -6,7 +6,7 @@ Code accompanying the manuscript
 
 > J. Bae, H. Lee, Y. Bae, H. Choe, J. Hu. *DD-FP: GPU Front Propagation with Slab Domain Decomposition for Digitally Well-Composed Interpolation of Biomedical Volumes.* Unpublished manuscript prepared for submission to *Computer Methods and Programs in Biomedicine* (citation to be added after publication; see [`CITATION.cff`](CITATION.cff)).
 
-> **CMPB submission code: v1.0.0.** The CMPB code is included in public `main`. The formal software release is [`v1.0.0`](https://github.com/jihun1184/DD-FP/releases/tag/v1.0.0); its tag identifies the exact release commit. The earlier Pattern Recognition submission code is preserved under `pr-2026-legacy` at `8fdfe6233dfe53f996ed2f09e8810bca53d5323b`. No software DOI has been issued or is claimed. The manuscript and its supplement take precedence over this file.
+> **CMPB submission code: v1.0.1.** The CMPB code is included in public `main`. The formal software release is [`v1.0.1`](https://github.com/jihun1184/DD-FP/releases/tag/v1.0.1); its tag identifies the exact release commit. `v1.0.1` changes documentation and adds retained evidence records and their recomputation script; all source files are identical to `v1.0.0` (`SHA256SUMS.txt`). `v1.0.0` is unchanged. The earlier Pattern Recognition submission code is preserved under `pr-2026-legacy` at `8fdfe6233dfe53f996ed2f09e8810bca53d5323b`. No software DOI has been issued or is claimed. The manuscript and its supplement take precedence over this file.
 
 ## 1. Purpose and contribution
 
@@ -14,7 +14,7 @@ Digitally well-composed (DWC) interpolation removes the connectivity-convention 
 
 1. **GPU execution and output verification of FP** (GPU-FP, K = 1): a five-property scheduling contract (P1–P5) and a level-synchronous GPU worklist.
 2. **Domain decomposition and boundary ownership** (DD-FP, K > 1): z-slabs, a one-voxel halo, window-local zero frames and an ascending-overwrite ownership rule.
-3. **A conditional DWC assembly theorem** (Theorem SA).
+3. **A conditional DWC assembly theorem** (Theorem 3.1, proved in Supplement S-A).
 4. **A runtime–memory trade-off and a biomedical evaluation** (BraTS 2021, DRIVE, CREMI), including unfavourable findings.
 
 No clinical or downstream benefit is claimed.
@@ -33,12 +33,13 @@ GPU-FP (K = 1) and DD-FP (K > 1) are **different operators**. In the evaluated v
 
 - **Output identity (GPU-FP).** In 20 BraTS 2021 volumes the GPU-FP output was identical to the sequential output (SHA-256 of the output arrays, 20/20). This is an observation on those volumes. That the CUDA code realizes P1–P5 is not proved (hypothesis H-GPU).
 - **DD-FP output.** At K = 16, δ = 1 direct assembly differed from the sequential output in 0.603–1.54 % of the 70,897,269 expanded cells per volume (IBI final 0.67–1.63 %). Neither is claimed to be better or worse.
-- **Theorem SA (conditional).** Unseeded direct assembly with z-slabs, δ = 1, zero frame, start level 0, integer-valued input in 0–255 and an admissible P1–P5 run yields a DWC array. The proof is hand-written (developed with AI assistance), not machine-verified and not independently reviewed. **IBI (seeded rounds) is outside the theorem**, as are other halo widths, other decomposition directions and other border conditions. δ = 1 is the analysed setting; no optimality is claimed. No bound R\* ≤ 2 is claimed.
-- **Empirical DWC verification.** Zero violations in 282,015,220 face and cube blocks per array, four arrays in each of 20 volumes; an independent CPU checker re-evaluated two arrays. The seam-layer survey of all 1,251 volumes covers xz/yz seam face blocks only. Zero observed violations are not a guarantee beyond the checked arrays.
+- **Theorem 3.1 (conditional; Supplement S-A).** Unseeded direct assembly with z-slabs, δ = 1, zero frame, start level 0, integer-valued input in 0–255 and an admissible P1–P5 run yields a DWC array. The proof is hand-written (developed with AI assistance), not machine-verified and not independently reviewed. **IBI (seeded rounds) is outside the theorem**, as are other halo widths, other decomposition directions and other border conditions. δ = 1 is the analysed setting; no optimality is claimed. No bound R\* ≤ 2 is claimed.
+- **Empirical DWC verification.** Zero violations in 282,015,220 face and cube blocks per array, four arrays in each of 20 volumes; an independent CPU checker re-evaluated two arrays. The saved arrays and the script that generated the direct-assembly arrays are not in this release (`docs/CODE_EXPERIMENT_MAPPING.md`). The seam-layer survey of all 1,251 volumes covers xz/yz seam face blocks only. Zero observed violations are not a guarantee beyond the checked arrays.
 - **Runtime.** One RTX 4090, 20 BraTS volumes: GPU-FP 14.1 s vs 111.9 s for the unoptimized single-thread Python reference, 8.05× (95 % CI 7.62–8.51); IBI final 14.5 s. This is not a comparison with optimized CPU code. An output-identical active-pile kernel was 7.48× faster than the frozen kernel (separate baseline).
 - **Memory.** Slabs solved in sequence on one device, matched slab thickness (about 9.7 layers): allocated peak 0.165–0.233 of the single pass for direct assembly, 0.717–0.742 for IBI final. Effective sample size about one; the single-device implementation retains full-volume arrays; no O(N/K) or out-of-memory-avoidance claim.
 - **Optional IBI.** No advantage on any measured quantity; it adds cost.
-- **Topology.** DWC removes the connectivity-convention ambiguity of the interpolated field; it does not preserve the topology of the original image. TSI = 0 holds by construction for binary outputs and is no evidence for DD-FP. On DRIVE the DD-FP output is more fragmented under 8-connectivity. Cross-arm comparisons involve different input types (gray-level vs binary) and are descriptive.
+- **Topology.** DWC removes the connectivity-convention ambiguity of the interpolated field; it does not preserve the topology of the original image. TSI = 0 holds by construction for binary outputs and is no evidence for DD-FP. On DRIVE the output of the arm labelled `ddfp` is more fragmented under 8-connectivity. Cross-arm comparisons involve different input types (gray-level vs binary) and are descriptive.
+- **Which algorithm ran in the biomedical records.** DRIVE and CREMI-2D, arm `ddfp`: single-window GPU-FP (K = 1; `DDFPPreprocessor` → `run_ddfp_2d` → one `immersion_pipeline` call; no slabs, no IBI). BraTS χ-flip (26.78 %) and the 1,251-volume seam check: DD-FP, K = 16, δ = 1, IBI final. Held-out reconstruction (BraTS, CREMI): GPU-FP (K = 1) against Min, Max and Linear. CREMI-3D and the 33-subject BraTS CC: the released scripts run one pass (K = 1; CREMI-3D on a patch padded by δ = 8 on the command line), but the stored values are not tied to a recorded run. Theorem 3.1 concerns unseeded direct assembly across slabs; K = 1 results are not evidence for it.
 
 ## 4. Data and preprocessing
 
@@ -53,7 +54,7 @@ The datasets are public and are **not** redistributed. `data/` is git-ignored.
 ## 5. Installation and environment
 
 ```bash
-git clone https://github.com/jihun1184/DD-FP.git && cd DD-FP && git checkout v1.0.0
+git clone https://github.com/jihun1184/DD-FP.git && cd DD-FP && git checkout v1.0.1
 python -m pip install -r requirements.txt
 python -m pip install cupy-cudaXXx      # GPU only; build matching your CUDA toolkit
 ```
@@ -98,7 +99,7 @@ python cmpb/theorem_tests/r0_verify.py checker                # proof-step consi
 
 Per-experiment commands, inputs, stored records and the status of each figure and table are in
 [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md), [`docs/CODE_EXPERIMENT_MAPPING.md`](docs/CODE_EXPERIMENT_MAPPING.md) and [`docs/FIGURE_TABLE_REPRODUCIBILITY.md`](docs/FIGURE_TABLE_REPRODUCIBILITY.md).
-In short: **the DRIVE and CREMI-2D aggregates, the memory and timing tables and part of the figures can be recomputed from the small stored records in `cmpb/data/`; the GPU experiments need a CUDA machine and the datasets; several records (saved output arrays of the whole-grid verification, per-subject BraTS 3-D topology data, raw rows of the Min/Max comparison) are not archived and the corresponding numbers cannot be recomputed from this repository.**
+In short: **the DRIVE and CREMI-2D aggregates, the memory and timing tables and part of the figures can be recomputed from the small stored records in `cmpb/data/` (including the held-out slice reconstruction records, `python3 -I cmpb/manuscript_tools/recompute_reconstruction.py cmpb/data`); the GPU experiments need a CUDA machine and the datasets; several records (saved output arrays of the whole-grid verification, per-subject BraTS 3-D topology data, raw rows of the 77-crop Min/Max operator comparison) are not archived and the corresponding numbers cannot be recomputed from this repository.**
 
 ## 8. Repository layout
 
@@ -128,4 +129,4 @@ SHA256SUMS.txt         SHA-256 of tracked release files (excluding this manifest
 
 ## 10. License and citation
 
-MIT, see [LICENSE](LICENSE). The datasets keep their own licences. Citation metadata: [`CITATION.cff`](CITATION.cff) (version 1.0.0, release date 2026-10-28; accompanying manuscript remains unpublished).
+MIT, see [LICENSE](LICENSE). The datasets keep their own licences. Citation metadata: [`CITATION.cff`](CITATION.cff) (version 1.0.1, release date 2026-10-29; accompanying manuscript remains unpublished).
